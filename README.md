@@ -44,3 +44,7 @@ Include the token in the authentication header when you make yor push notificati
    'authentication' 'bearer $token'
 ```
 
+## Documentation
+
+For a detailed guide, please visit the [APNs documentation](https://developer.apple.com/library/archive/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/APNSOverview.html#//apple_ref/doc/uid/TP40008194-CH8-SW1) page by Apple.
+
