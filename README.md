@@ -1,7 +1,41 @@
+[![Release](https://img.shields.io/github/release/PhilJay/APNJWT.svg?style=flat)](https://jitpack.io/#PhilJay/APNJWT)
+
 # APNJWT
 Kotlin JWT implementation (Json Web Token) as required by APNs (Apple Push Notification Service), for use on Kotlin powered backend servers.
 
 No other dependencies required.
+
+## Dependency 
+
+Add the following to your **build.gradle** file:
+```groovy
+allprojects {
+    repositories {
+        maven { url 'https://jitpack.io' }
+    }
+}
+
+dependencies {
+    implementation 'com.github.PhilJay:APNJWT:1.0.1'
+}
+```
+
+Or add the following to your **pom.xml**:
+
+```xml
+<repositories>
+    <repository>
+        <id>jitpack.io</id>
+        <url>https://jitpack.io</url>
+    </repository>
+</repositories>
+
+<dependency>
+    <groupId>com.github.PhilJay</groupId>
+    <artifactId>APNJWT</artifactId>
+    <version>1.0.1</version>
+</dependency>
+```
 
 ## Sample Usage
 
