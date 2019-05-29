@@ -3,8 +3,8 @@ plugins {
     id 'org.jetbrains.kotlin.jvm' version '1.3.31'
 }
 
-group 'com.philjay'
-version '1.0.0'
+group 'com.philjay.apnjwt'
+version '1.0.1'
 
 sourceCompatibility = 1.8
 

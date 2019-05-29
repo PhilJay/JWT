@@ -1,4 +1,4 @@
-package com.philjay
+package com.philjay.apnjwt
 
 
 import java.nio.charset.StandardCharsets
@@ -26,7 +26,8 @@ object JWT {
      * @return A valid JWT token.
      */
     fun token(teamId: String, keyId: String, secret: String, mapper: Mapper, encoder: Base64Encoder,
-              decoder: Base64Decoder):
+              decoder: Base64Decoder
+    ):
             String {
 
         val now = (System.currentTimeMillis() / 1000).toInt() // token timestamp in seconds
