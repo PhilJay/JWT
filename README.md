@@ -38,7 +38,7 @@ Create the token by providing the teamId, keyId and secret (private key excludin
     val token = JWT.token("teamId", "keyId", "secret", mapper, encoder, decoder)
 ```
 
-Use the token in the authentication header:
+Include the token in the authentication header when you make yor push notification request to APNs:
 
 ```
    'authentication' 'bearer $token'
