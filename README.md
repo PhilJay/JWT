@@ -1,6 +1,7 @@
 # APNJWT
 Kotlin JWT implementation (Json Web Token) as required by APNs (Apple Push Notification Service), for use on Kotlin powered backend servers.
 
+No other dependencies required.
 
 ## Sample Usage
 
