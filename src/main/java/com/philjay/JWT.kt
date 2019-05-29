@@ -6,9 +6,7 @@ import java.security.KeyFactory
 import java.security.Signature
 import java.security.spec.PKCS8EncodedKeySpec
 
-/**
- * Json Web Token (JWT) implementation as required per Apple Push Notifications (APN) specification.
- */
+
 object JWT {
 
     /**
