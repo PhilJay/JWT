@@ -79,6 +79,12 @@ Include the token in the authentication header when you make yor push notificati
    'authentication' 'bearer $token'
 ```
 
+If you are [sending pushes to iOS 13+ devices](https://developer.apple.com/documentation/usernotifications/setting_up_a_remote_notification_server/sending_notification_requests_to_apns), also include the `apns-push-type` header:
+
+```
+   'apns-push-type' 'alert' // possible values are 'alert' or 'background'
+```
+
 ## Documentation
 
 For a detailed guide, please visit the [APNs documentation](https://developer.apple.com/library/archive/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/APNSOverview.html#//apple_ref/doc/uid/TP40008194-CH8-SW1) page by Apple.
