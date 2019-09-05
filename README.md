@@ -67,7 +67,7 @@ Create required encoders, decoders and JSON Mapper (e.g. Gson or equivalent). Th
     }
 ```
 
-Create the token by providing the teamId, keyId and secret (private key excluding header and footer). The teamId can be obtained from the developer member center. The keyId can be obtained when you create your secret (private key).
+Create the token by providing your teamId, keyId and secret (private key excluding header and footer). The teamId can be obtained from the developer member center. The keyId can be obtained when you create your secret (private key).
 
 ```kotlin
     val token = JWT.token("teamId", "keyId", "secret", mapper, encoder, decoder)
