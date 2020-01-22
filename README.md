@@ -97,7 +97,7 @@ If you are [sending pushes to iOS 13+ devices](https://developer.apple.com/docum
 
 If you want to decode a JWT String, create a JSON decoder:
 
-```
+```kotlin
     private val jsonDecoder = object : JsonDecoder<JWTAuthHeader, JWTAuthPayload> {
 
         override fun headerFrom(json: String): JWTAuthHeader {
@@ -111,7 +111,7 @@ If you want to decode a JWT String, create a JSON decoder:
 ```
 
 Use the json decoder to decode your token String:
-```
+```kotlin
     val tokenString = "ey..." // a valid JWT as a String
     val token: JWTToken<JWTAuthHeader, JWTAuthPayload>? = JWT.decode(tokenString, jsonDecoder, decoder)
     // conveniently access properties of the token...
