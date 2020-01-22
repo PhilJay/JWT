@@ -1,10 +1,10 @@
 plugins {
     id 'java'
-    id 'org.jetbrains.kotlin.jvm' version '1.3.60'
+    id 'org.jetbrains.kotlin.jvm' version '1.3.31'
 }
 
 group 'com.philjay.apnjwt'
-version '1.0.2'
+version '1.0.3'
 
 sourceCompatibility = 1.8
 

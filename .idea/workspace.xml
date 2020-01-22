@@ -51,6 +51,7 @@
     <property name="project.structure.last.edited" value="Modules" />
     <property name="project.structure.proportion" value="0.0" />
     <property name="project.structure.side.proportion" value="0.2" />
+    <property name="settings.editor.selected.configurable" value="reference.settingsdialog.project.gradle" />
   </component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
@@ -100,7 +101,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1559132882310</updated>
-      <workItem from="1579693380304" duration="236000" />
+      <workItem from="1579693380304" duration="473000" />
     </task>
     <servers />
   </component>
@@ -112,6 +113,14 @@
       <screen x="1792" y="23" width="2560" height="1417" />
     </state>
     <state x="2785" y="640" key="#com.intellij.ide.util.projectWizard.JdkChooserPanel.MyDialog/1792.23.2560.1417/4352.23.1920.1057/0.23.1792.1097@1792.23.2560.1417" timestamp="1579693388719" />
+    <state x="2453" y="370" key="SettingsEditor" timestamp="1579693849503">
+      <screen x="1792" y="23" width="2560" height="1417" />
+    </state>
+    <state x="2453" y="370" key="SettingsEditor/1792.23.2560.1417/4352.23.1920.1057/0.23.1792.1097@1792.23.2560.1417" timestamp="1579693849503" />
+    <state x="2617" y="346" width="670" height="675" key="run.anything.popup" timestamp="1579693832596">
+      <screen x="1792" y="23" width="2560" height="1417" />
+    </state>
+    <state x="2617" y="346" width="670" height="675" key="run.anything.popup/1792.23.2560.1417/4352.23.1920.1057/0.23.1792.1097@1792.23.2560.1417" timestamp="1579693832596" />
   </component>
   <component name="masterDetails">
     <states>
