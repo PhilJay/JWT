@@ -37,7 +37,7 @@ Or add the following to your **pom.xml**:
 </dependency>
 ```
 
-## Sample Usage
+## Creating JWT
 
 Create required encoders, decoders and JSON Mapper (e.g. Gson or equivalent). These are later used to properly encode or decode the token header and payload.
 
@@ -85,17 +85,36 @@ Include the token in the authentication header when you make yor push notificati
    'authentication' 'bearer $token'
 ```
 
-Decoding JWT Strings:
 
-```
-    val tokenString = "..." // a valid JWT as a String
-    
-```
 
 If you are [sending pushes to iOS 13+ devices](https://developer.apple.com/documentation/usernotifications/setting_up_a_remote_notification_server/sending_notification_requests_to_apns), also include the `apns-push-type` header:
 
 ```
    'apns-push-type' 'alert' // possible values are 'alert' or 'background'
+```
+
+## Decoding JWT
+
+If you want to decode a JWT String, create a JSON decoder:
+
+```
+    private val jsonDecoder = object : JsonDecoder<JWTAuthHeader, JWTAuthPayload> {
+
+        override fun headerFrom(json: String): JWTAuthHeader {
+            return gson.fromJson(json, JWTAuthHeader::class.java)
+        }
+
+        override fun palyoadFrom(json: String): JWTAuthPayload {
+            return gson.fromJson(json, JWTAuthPayload::class.java)
+        }
+    }
+```
+
+Use the json decoder to decode your token String:
+```
+    val tokenString = "ey..." // a valid JWT as a String
+    val token: JWTToken<JWTAuthHeader, JWTAuthPayload>? = JWT.decode(tokenString, jsonDecoder, decoder)
+    // conveniently access properties of the token...
 ```
 
 ## Documentation
