@@ -76,14 +76,14 @@ object JWT {
      */
     fun <H : JWTAuthHeader, P : JWTAuthPayload> decode(
         jwtTokenString: String,
-        jsonDecoder: JsonDecoder<H, P>
+        jsonDecoder: JsonDecoder<H, P>,
+        decoder: Base64Decoder
     ): JWTToken<H, P>? {
         val parts = jwtTokenString.split(".")
         return if (parts.size >= 2) {
 
-            val decoder = Base64.getDecoder()
-            val headerJson = decoder.decode(parts[0]).toString(UTF_8)
-            val payloadJson = decoder.decode(parts[1]).toString(UTF_8)
+            val headerJson = decoder.decode(parts[0].toByteArray(UTF_8)).toString(UTF_8)
+            val payloadJson = decoder.decode(parts[1].toByteArray(UTF_8)).toString(UTF_8)
 
             val header: H = jsonDecoder.headerFrom(headerJson)
             val payload: P = jsonDecoder.palyoadFrom(payloadJson)

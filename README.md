@@ -16,7 +16,7 @@ allprojects {
 }
 
 dependencies {
-    implementation 'com.github.PhilJay:APNJWT:1.0.3'
+    implementation 'com.github.PhilJay:APNJWT:1.0.5'
 }
 ```
 
@@ -33,7 +33,7 @@ Or add the following to your **pom.xml**:
 <dependency>
     <groupId>com.github.PhilJay</groupId>
     <artifactId>APNJWT</artifactId>
-    <version>1.0.3</version>
+    <version>1.0.5</version>
 </dependency>
 ```
 
@@ -43,13 +43,14 @@ Create required encoders, decoders and JSON Mapper (e.g. Gson or equivalent). Th
 
 ```kotlin
     val gson = GsonBuilder().create()
-
-    val mapper = object : Mapper {
-        override fun jsonString(header: JWTAuthHeader): String {
+ 
+    // generic JSON encoder
+    val jsonEncoder = object : JsonEncoder<JWTAuthHeader, JWTAuthPayload> {
+        override fun toJson(header: JWTAuthHeader): String {
             return gson.toJson(header, JWTAuthHeader::class.java)
         }
-
-        override fun jsonString(payload: JWTAuthPayload): String {
+    
+        override fun toJson(payload: JWTAuthPayload): String {
             return gson.toJson(payload, JWTAuthPayload::class.java)
         }
     }
@@ -70,18 +71,25 @@ Create required encoders, decoders and JSON Mapper (e.g. Gson or equivalent). Th
 Create the token by providing your teamId, keyId and secret (private key excluding header and footer). The teamId can be obtained from the developer member center. The keyId can be obtained when you create your secret (private key).
 
 ```kotlin
-    val token = JWT.token("teamId", "keyId", "secret", mapper, encoder, decoder)
+    val token = JWT.token("teamId", "keyId", "secret", jsonEncoder, encoder, decoder)
 
     // or...
     val header = JWTAuthHeader(...)
     val payload = JWTAuthPayload(...)
-    val token = JWT.token(header, payload, "secret", mapper, encoder, decoder)
+    val token = JWT.token(header, payload, "secret", jsonEncoder, encoder, decoder)
 ```
 
 Include the token in the authentication header when you make yor push notification request to APNs:
 
 ```
    'authentication' 'bearer $token'
+```
+
+Decoding JWT Strings:
+
+```
+    val tokenString = "..." // a valid JWT as a String
+    
 ```
 
 If you are [sending pushes to iOS 13+ devices](https://developer.apple.com/documentation/usernotifications/setting_up_a_remote_notification_server/sending_notification_requests_to_apns), also include the `apns-push-type` header:
