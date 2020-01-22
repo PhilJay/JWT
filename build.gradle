@@ -4,7 +4,7 @@ plugins {
 }
 
 group 'com.philjay.apnjwt'
-version '1.0.3'
+version '1.0.4'
 
 sourceCompatibility = 1.8
 
