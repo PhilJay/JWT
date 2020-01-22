@@ -16,7 +16,7 @@ allprojects {
 }
 
 dependencies {
-    implementation 'com.github.PhilJay:APNJWT:1.0.1'
+    implementation 'com.github.PhilJay:APNJWT:1.0.2'
 }
 ```
 
@@ -33,7 +33,7 @@ Or add the following to your **pom.xml**:
 <dependency>
     <groupId>com.github.PhilJay</groupId>
     <artifactId>APNJWT</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
 </dependency>
 ```
 
@@ -71,6 +71,11 @@ Create the token by providing your teamId, keyId and secret (private key excludi
 
 ```kotlin
     val token = JWT.token("teamId", "keyId", "secret", mapper, encoder, decoder)
+
+    // or...
+    val header = JWTAuthHeader(...)
+    val payload = JWTAuthPayload(...)
+    val token = JWT.token(header, payload, "secret", mapper, encoder, decoder)
 ```
 
 Include the token in the authentication header when you make yor push notification request to APNs:
