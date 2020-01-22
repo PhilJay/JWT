@@ -33,11 +33,12 @@
       </state>
     </system>
   </component>
-  <component name="ProjectFrameBounds">
-    <option name="x" value="4303" />
-    <option name="y" value="58" />
-    <option name="width" value="1705" />
-    <option name="height" value="1057" />
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Kotlin Class" />
+      </list>
+    </option>
   </component>
   <component name="ProjectId" id="1WkV3E09oDmot7Y5RDdCQF3Fxim" />
   <component name="ProjectViewState">
@@ -101,7 +102,8 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1559132882310</updated>
-      <workItem from="1579693380304" duration="473000" />
+      <workItem from="1579693380304" duration="567000" />
+      <workItem from="1579694944583" duration="2830000" />
     </task>
     <servers />
   </component>
@@ -109,10 +111,50 @@
     <option name="version" value="1" />
   </component>
   <component name="WindowStateProjectService">
+    <state x="2416" y="395" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1579698310206">
+      <screen x="1792" y="23" width="2560" height="1417" />
+    </state>
+    <state x="2416" y="395" key="#com.intellij.execution.impl.EditConfigurationsDialog/1792.23.2560.1417/4352.23.1920.1057/0.23.1792.1097@1792.23.2560.1417" timestamp="1579698310206" />
+    <state x="2689" y="525" key="#com.intellij.ide.util.TreeClassChooserDialog" timestamp="1579695578501">
+      <screen x="1792" y="23" width="2560" height="1417" />
+    </state>
+    <state x="2689" y="525" key="#com.intellij.ide.util.TreeClassChooserDialog/1792.23.2560.1417/4352.23.1920.1057/0.23.1792.1097@1792.23.2560.1417" timestamp="1579695578501" />
     <state x="2785" y="640" key="#com.intellij.ide.util.projectWizard.JdkChooserPanel.MyDialog" timestamp="1579693388719">
       <screen x="1792" y="23" width="2560" height="1417" />
     </state>
     <state x="2785" y="640" key="#com.intellij.ide.util.projectWizard.JdkChooserPanel.MyDialog/1792.23.2560.1417/4352.23.1920.1057/0.23.1792.1097@1792.23.2560.1417" timestamp="1579693388719" />
+    <state width="2076" height="501" key="GridCell.Tab.0.bottom" timestamp="1579695785948">
+      <screen x="1792" y="23" width="2560" height="1417" />
+    </state>
+    <state width="2076" height="501" key="GridCell.Tab.0.bottom/1792.23.2560.1417/4352.23.1920.1057/0.23.1792.1097@1792.23.2560.1417" timestamp="1579695785948" />
+    <state width="2076" height="501" key="GridCell.Tab.0.center" timestamp="1579695785947">
+      <screen x="1792" y="23" width="2560" height="1417" />
+    </state>
+    <state width="2076" height="501" key="GridCell.Tab.0.center/1792.23.2560.1417/4352.23.1920.1057/0.23.1792.1097@1792.23.2560.1417" timestamp="1579695785947" />
+    <state width="2076" height="501" key="GridCell.Tab.0.left" timestamp="1579695785946">
+      <screen x="1792" y="23" width="2560" height="1417" />
+    </state>
+    <state width="2076" height="501" key="GridCell.Tab.0.left/1792.23.2560.1417/4352.23.1920.1057/0.23.1792.1097@1792.23.2560.1417" timestamp="1579695785946" />
+    <state width="2076" height="501" key="GridCell.Tab.0.right" timestamp="1579695785947">
+      <screen x="1792" y="23" width="2560" height="1417" />
+    </state>
+    <state width="2076" height="501" key="GridCell.Tab.0.right/1792.23.2560.1417/4352.23.1920.1057/0.23.1792.1097@1792.23.2560.1417" timestamp="1579695785947" />
+    <state width="2076" height="501" key="GridCell.Tab.1.bottom" timestamp="1579698319497">
+      <screen x="1792" y="23" width="2560" height="1417" />
+    </state>
+    <state width="2076" height="501" key="GridCell.Tab.1.bottom/1792.23.2560.1417/4352.23.1920.1057/0.23.1792.1097@1792.23.2560.1417" timestamp="1579698319497" />
+    <state width="2076" height="501" key="GridCell.Tab.1.center" timestamp="1579698319496">
+      <screen x="1792" y="23" width="2560" height="1417" />
+    </state>
+    <state width="2076" height="501" key="GridCell.Tab.1.center/1792.23.2560.1417/4352.23.1920.1057/0.23.1792.1097@1792.23.2560.1417" timestamp="1579698319496" />
+    <state width="2076" height="501" key="GridCell.Tab.1.left" timestamp="1579698319495">
+      <screen x="1792" y="23" width="2560" height="1417" />
+    </state>
+    <state width="2076" height="501" key="GridCell.Tab.1.left/1792.23.2560.1417/4352.23.1920.1057/0.23.1792.1097@1792.23.2560.1417" timestamp="1579698319495" />
+    <state width="2076" height="501" key="GridCell.Tab.1.right" timestamp="1579698319496">
+      <screen x="1792" y="23" width="2560" height="1417" />
+    </state>
+    <state width="2076" height="501" key="GridCell.Tab.1.right/1792.23.2560.1417/4352.23.1920.1057/0.23.1792.1097@1792.23.2560.1417" timestamp="1579698319496" />
     <state x="2453" y="370" key="SettingsEditor" timestamp="1579693849503">
       <screen x="1792" y="23" width="2560" height="1417" />
     </state>
