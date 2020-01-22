@@ -12,7 +12,7 @@ object JWT {
     /**
      * The encryption algorithm to be used to encrypt the token.
      */
-    private const val algorithm = "ES256"
+    const val algorithm = "ES256"
 
     /**
      * Generates a JWT token as per Apple's specifications. Does not include the required "bearer" prefix.
@@ -25,15 +25,34 @@ object JWT {
      * @param decoder A decoder to base64 decode ByteArrays.
      * @return A valid JWT token.
      */
-    fun token(teamId: String, keyId: String, secret: String, mapper: Mapper, encoder: Base64Encoder,
-              decoder: Base64Decoder
-    ):
-            String {
+    fun token(
+        teamId: String, keyId: String, secret: String, mapper: Mapper, encoder: Base64Encoder,
+        decoder: Base64Decoder
+    ): String {
 
         val now = (System.currentTimeMillis() / 1000).toInt() // token timestamp in seconds
 
-        val header = JWTAuthHeader(algorithm, keyId)
+        val header = JWTAuthHeader(kid = keyId)
         val payload = JWTAuthPayload(teamId, now)
+
+        return token(header, payload, secret, mapper, encoder, decoder)
+    }
+
+    /**
+     * Generates a JWT token as per Apple's specifications. Does not include the required "bearer" prefix.
+     *
+     * @param header The auth header usually containing algorithm and key id.
+     * @param payload The payload usually containing at least the team id and timestamp.
+     * @param secret The private key (without the header and the footer - as in (BEGIN KEY...)
+     * @param mapper: A mapper to transform JWT header and payload to a json String.
+     * @param encoder An encoder to base64 encode the JWT header and payload json String.
+     * @param decoder A decoder to base64 decode ByteArrays.
+     * @return A valid JWT token.
+     */
+    fun token(
+        header: JWTAuthHeader, payload: JWTAuthPayload, secret: String, mapper: Mapper, encoder: Base64Encoder,
+        decoder: Base64Decoder
+    ): String {
 
         val headerString = mapper.jsonString(header)
         val payloadString = mapper.jsonString(payload)
@@ -102,17 +121,19 @@ interface Base64Decoder {
 /**
  * JWT Authentication token header.
  */
-data class JWTAuthHeader(
-        /** the encryption algorithm used */
-        val alg: String,
-        /** the key identifier (found when generating private key) */
-        val kid: String)
+open class JWTAuthHeader(
+    /** the encryption algorithm used, defaults to ES256 */
+    val alg: String = JWT.algorithm,
+    /** the key identifier (found when generating private key) */
+    val kid: String
+)
 
 /**
  * JWT authentication token payload.
  */
-data class JWTAuthPayload(
-        /** the issuer of the token (team id found in developer member center) */
-        val iss: String,
-        /** token issued at timestamp in seconds since Epoch (UTC) */
-        val iat: Int)
+open class JWTAuthPayload(
+    /** the issuer of the token (team id found in developer member center) */
+    val iss: String,
+    /** token issued at timestamp in seconds since Epoch (UTC) */
+    val iat: Int
+)
