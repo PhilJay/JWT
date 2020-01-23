@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.security.KeyFactory
 import java.security.Signature
 import java.security.spec.PKCS8EncodedKeySpec
-import java.util.*
+import java.time.Instant
 
 
 object JWT {
@@ -20,7 +20,7 @@ object JWT {
      * @param teamId The team identifier (can be obtained from the developer console member center)
      * @param keyId  The key identifier (can be obtained when generating your private key)
      * @param secret The private key (without the header and the footer - as in (BEGIN KEY...)
-     * @param mapper: A mapper to transform JWT header and payload to a json String.
+     * @param jsonEncoder: A mapper to transform JWT header and payload to a json String.
      * @param encoder An encoder to base64 encode the JWT header and payload json String.
      * @param decoder A decoder to base64 decode ByteArrays.
      * @return A valid JWT token.
@@ -34,7 +34,7 @@ object JWT {
         decoder: Base64Decoder
     ): String {
 
-        val now = (System.currentTimeMillis() / 1000).toInt() // token timestamp in seconds
+        val now = Instant.now().epochSecond // token timestamp in seconds
 
         val header = JWTAuthHeader(kid = keyId)
         val payload = JWTAuthPayload(teamId, now)
@@ -72,6 +72,9 @@ object JWT {
 
     /**
      * Decodes the provided JWT token string and turns it into a JWTToken object for easy property access.
+     * @param jwtTokenString The JWT token to decode as a String.
+     * @param jsonDecoder Mapper to transform the JSON String to JSON objects.
+     * @param decoder A decoder to base64 decode ByteArrays.
      * @return JWT token object.
      */
     fun <H : JWTAuthHeader, P : JWTAuthPayload> decode(
@@ -86,7 +89,7 @@ object JWT {
             val payloadJson = decoder.decode(parts[1].toByteArray(UTF_8)).toString(UTF_8)
 
             val header: H = jsonDecoder.headerFrom(headerJson)
-            val payload: P = jsonDecoder.palyoadFrom(payloadJson)
+            val payload: P = jsonDecoder.payloadFrom(payloadJson)
             JWTToken(header, payload)
         } else {
             null
@@ -137,7 +140,7 @@ interface JsonDecoder<H : JWTAuthHeader, P : JWTAuthPayload> {
      * Transforms the provided payload json String into a payload object.
      * @return A payload object representing the json String.
      */
-    fun palyoadFrom(json: String): P
+    fun payloadFrom(json: String): P
 }
 
 interface Base64Encoder {
@@ -180,5 +183,5 @@ open class JWTAuthPayload(
     /** the issuer of the token (team id found in developer member center) */
     val iss: String,
     /** token issued at timestamp in seconds since Epoch (UTC) */
-    val iat: Int
+    val iat: Long
 )
