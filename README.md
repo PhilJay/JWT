@@ -79,20 +79,6 @@ Create the token by providing your teamId, keyId and secret (private key excludi
     val token = JWT.token(header, payload, "secret", jsonEncoder, encoder, decoder)
 ```
 
-Include the token in the authentication header when you make yor push notification request to APNs:
-
-```
-   'authentication' 'bearer $token'
-```
-
-
-
-If you are [sending pushes to iOS 13+ devices](https://developer.apple.com/documentation/usernotifications/setting_up_a_remote_notification_server/sending_notification_requests_to_apns), also include the `apns-push-type` header:
-
-```
-   'apns-push-type' 'alert' // possible values are 'alert' or 'background'
-```
-
 ## Decoding JWT
 
 If you want to decode a JWT String, create a JSON decoder:
@@ -117,7 +103,23 @@ Use the json decoder to decode your token String:
     // conveniently access properties of the token...
 ```
 
+## Usage with APNs
+
+Include the token in the authentication header when you make yor push notification request to APNs:
+
+```
+   'authentication' 'bearer $token'
+```
+
+
+
+If you are [sending pushes to iOS 13+ devices](https://developer.apple.com/documentation/usernotifications/setting_up_a_remote_notification_server/sending_notification_requests_to_apns), also include the `apns-push-type` header:
+
+```
+   'apns-push-type' 'alert' // possible values are 'alert' or 'background'
+```
+
 ## Documentation
 
-For a detailed guide, please visit the [APNs documentation](https://developer.apple.com/library/archive/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/APNSOverview.html#//apple_ref/doc/uid/TP40008194-CH8-SW1) page by Apple.
+For a detailed guide, please visit the [APNs documentation](https://developer.apple.com/library/archive/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/APNSOverview.html#//apple_ref/doc/uid/TP40008194-CH8-SW1) page by Apple as well as the [verifying users](https://developer.apple.com/documentation/signinwithapplerestapi/verifying_a_user) and [generating tokens](https://developer.apple.com/documentation/signinwithapplerestapi/generate_and_validate_tokens) pages for Sign in with Apple.
 
