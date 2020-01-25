@@ -1,6 +1,6 @@
 [![Release](https://img.shields.io/github/release/PhilJay/APNJWT.svg?style=flat)](https://jitpack.io/#PhilJay/APNJWT)
 
-# APNJWT
+# JWT
 Kotlin JWT implementation (Json Web Token) as required by APNs (Apple Push Notification Service) or Sign in with Apple, for use on Kotlin powered backend servers. Eases the process of creating the token based on your credentials.
 
 No other dependencies required.
