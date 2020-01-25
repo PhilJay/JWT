@@ -1,7 +1,7 @@
 [![Release](https://img.shields.io/github/release/PhilJay/APNJWT.svg?style=flat)](https://jitpack.io/#PhilJay/APNJWT)
 
 # JWT
-Kotlin JWT implementation (Json Web Token) as required by APNs (Apple Push Notification Service) or Sign in with Apple, for use on Kotlin powered backend servers. Eases the process of creating the token based on your credentials.
+Kotlin JWT implementation (Json Web Token) designed for **Apple**, as required by APNs (Apple Push Notification Service) or Sign in with Apple, for use on Kotlin powered backend servers. Eases the process of creating the token based on your credentials.
 
 No other dependencies required.
 
@@ -16,7 +16,7 @@ allprojects {
 }
 
 dependencies {
-    implementation 'com.github.PhilJay:APNJWT:1.0.6'
+    implementation 'com.github.PhilJay:JWT:1.0.7'
 }
 ```
 
@@ -32,8 +32,8 @@ Or add the following to your **pom.xml**:
 
 <dependency>
     <groupId>com.github.PhilJay</groupId>
-    <artifactId>APNJWT</artifactId>
-    <version>1.0.6</version>
+    <artifactId>JWT</artifactId>
+    <version>1.0.7</version>
 </dependency>
 ```
 

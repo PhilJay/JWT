@@ -21,12 +21,7 @@
       <state>
         <projects_view>
           <tree_state>
-            <expand>
-              <path>
-                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
-                <item name="apn-jwt" type="f1a62948:ProjectNode" />
-              </path>
-            </expand>
+            <expand />
             <select />
           </tree_state>
         </projects_view>
@@ -104,7 +99,10 @@
       <updated>1559132882310</updated>
       <workItem from="1579693380304" duration="567000" />
       <workItem from="1579694944583" duration="4513000" />
-      <workItem from="1579779722002" duration="265000" />
+      <workItem from="1579779722002" duration="431000" />
+      <workItem from="1579788046664" duration="1660000" />
+      <workItem from="1579952473362" duration="96000" />
+      <workItem from="1579952594624" duration="182000" />
     </task>
     <servers />
   </component>
@@ -156,97 +154,14 @@
       <screen x="1792" y="23" width="2560" height="1417" />
     </state>
     <state width="2076" height="501" key="GridCell.Tab.1.right/1792.23.2560.1417/4352.23.1920.1057/0.23.1792.1097@1792.23.2560.1417" timestamp="1579701120018" />
-    <state x="2453" y="370" key="SettingsEditor" timestamp="1579693849503">
-      <screen x="1792" y="23" width="2560" height="1417" />
+    <state x="463" y="286" key="SettingsEditor" timestamp="1579952534931">
+      <screen x="0" y="23" width="1792" height="1097" />
     </state>
+    <state x="463" y="286" key="SettingsEditor/0.23.1792.1097@0.23.1792.1097" timestamp="1579952534931" />
     <state x="2453" y="370" key="SettingsEditor/1792.23.2560.1417/4352.23.1920.1057/0.23.1792.1097@1792.23.2560.1417" timestamp="1579693849503" />
     <state x="2617" y="346" width="670" height="675" key="run.anything.popup" timestamp="1579693832596">
       <screen x="1792" y="23" width="2560" height="1417" />
     </state>
     <state x="2617" y="346" width="670" height="675" key="run.anything.popup/1792.23.2560.1417/4352.23.1920.1057/0.23.1792.1097@1792.23.2560.1417" timestamp="1579693832596" />
-  </component>
-  <component name="masterDetails">
-    <states>
-      <state key="ArtifactsStructureConfigurable.UI">
-        <settings>
-          <artifact-editor />
-          <splitter-proportions>
-            <option name="proportions">
-              <list>
-                <option value="0.2" />
-              </list>
-            </option>
-          </splitter-proportions>
-        </settings>
-      </state>
-      <state key="FacetStructureConfigurable.UI">
-        <settings>
-          <splitter-proportions>
-            <option name="proportions">
-              <list>
-                <option value="0.2" />
-              </list>
-            </option>
-          </splitter-proportions>
-        </settings>
-      </state>
-      <state key="GlobalLibrariesConfigurable.UI">
-        <settings>
-          <splitter-proportions>
-            <option name="proportions">
-              <list>
-                <option value="0.2" />
-              </list>
-            </option>
-          </splitter-proportions>
-        </settings>
-      </state>
-      <state key="JdkListConfigurable.UI">
-        <settings>
-          <splitter-proportions>
-            <option name="proportions">
-              <list>
-                <option value="0.2" />
-              </list>
-            </option>
-          </splitter-proportions>
-        </settings>
-      </state>
-      <state key="ModuleStructureConfigurable.UI">
-        <settings>
-          <last-edited>main|apn-jwt</last-edited>
-          <splitter-proportions>
-            <option name="proportions">
-              <list>
-                <option value="0.2" />
-              </list>
-            </option>
-          </splitter-proportions>
-        </settings>
-      </state>
-      <state key="ProjectJDKs.UI">
-        <settings>
-          <last-edited>1.8</last-edited>
-          <splitter-proportions>
-            <option name="proportions">
-              <list>
-                <option value="0.2" />
-              </list>
-            </option>
-          </splitter-proportions>
-        </settings>
-      </state>
-      <state key="ProjectLibrariesConfigurable.UI">
-        <settings>
-          <splitter-proportions>
-            <option name="proportions">
-              <list>
-                <option value="0.2" />
-              </list>
-            </option>
-          </splitter-proportions>
-        </settings>
-      </state>
-    </states>
   </component>
 </project>
