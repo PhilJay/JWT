@@ -129,9 +129,9 @@ object JWT {
             val parts = jwt.split(tokenDelimiter)
 
             if (parts.size == 3) {
-                val header = decoder.decode(parts[0].toByteArray(charset))
-                val payload = decoder.decode(parts[1].toByteArray(charset))
-                val tokenSignature = decoder.decode(parts[2].toByteArray(charset))
+                val header = parts[0].toByteArray(charset)
+                val payload = parts[1].toByteArray(charset)
+                val tokenSignature = parts[2].toByteArray(charset)
 
                 val rsaSignature = Signature.getInstance(algorithm)
                 rsaSignature.initVerify(rsa)
