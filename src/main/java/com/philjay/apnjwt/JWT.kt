@@ -12,7 +12,6 @@ import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.RSAPublicKeySpec
 import java.security.spec.X509EncodedKeySpec
 import java.time.Instant
-import java.util.*
 import kotlin.text.Charsets.UTF_8
 
 
@@ -21,7 +20,7 @@ object JWT {
      * The encryption algorithm to be used to encrypt the token.
      */
     const val algorithm = "ES256"
-    private const val tokenDelimiter = "."
+    private const val tokenDelimiter = '.'
 
     /**
      * Generates a JWT token as per Apple's specifications. Does not include the required "bearer" prefix.
