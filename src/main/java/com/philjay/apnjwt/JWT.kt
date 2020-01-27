@@ -20,6 +20,7 @@ object JWT {
      * The encryption algorithm to be used to encrypt the token.
      */
     const val algorithm = "ES256"
+    private const val verifyAlgorithm = "SHA256withRSA"
     private const val tokenDelimiter = '.'
 
     /**
@@ -118,7 +119,7 @@ object JWT {
      * Verifies the provided JWT String with the provided JWK object.
      * @return True if validation was successful, false if not.
      */
-    fun verify(jwt: String, jwk: JWKObject, decoder: Base64Decoder, charset: Charset = UTF_8): Boolean {
+    fun verify(jwt: String, jwk: JWKObject, decoder: Base64Decoder, algorithm: String = verifyAlgorithm, charset: Charset = UTF_8): Boolean {
 
         val rsa = jwk.toRSA(decoder)
 
@@ -132,13 +133,12 @@ object JWT {
                 val payload = decoder.decode(parts[1].toByteArray(charset))
                 val tokenSignature = decoder.decode(parts[2].toByteArray(charset))
 
-                val rsaSignature = Signature.getInstance("SHA256withRSA")
+                val rsaSignature = Signature.getInstance(algorithm)
                 rsaSignature.initVerify(rsa)
                 rsaSignature.update(header)
                 rsaSignature.update(tokenDelimiter.toByte())
                 rsaSignature.update(payload)
                 rsaSignature.verify(tokenSignature)
-                true
             } else {
                 false
             }
