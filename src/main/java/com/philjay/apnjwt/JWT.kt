@@ -133,7 +133,7 @@ object JWT {
                 val payload = decoder.decode(parts[1].toByteArray(charset))
                 val tokenSignature = decoder.decode(parts[2].toByteArray(charset))
 
-                val rsaSignature = Signature.getInstance("RSA")
+                val rsaSignature = Signature.getInstance("SHA256withRSA")
                 rsaSignature.initVerify(rsa)
                 rsaSignature.update(header)
                 rsaSignature.update(tokenDelimiter.toByte())

@@ -16,7 +16,7 @@ allprojects {
 }
 
 dependencies {
-    implementation 'com.github.PhilJay:JWT:1.0.10'
+    implementation 'com.github.PhilJay:JWT:1.1.0'
 }
 ```
 
@@ -33,7 +33,7 @@ Or add the following to your **pom.xml**:
 <dependency>
     <groupId>com.github.PhilJay</groupId>
     <artifactId>JWT</artifactId>
-    <version>1.0.10</version>
+    <version>1.1.0</version>
 </dependency>
 ```
 
@@ -55,15 +55,25 @@ Create required encoders, decoders and JSON Mapper (e.g. Gson or equivalent). Th
         }
     }
 
-    val encoder = object : Base64Encoder {
+    // Base64 encoder using apache commons
+    private val encoder = object : Base64Encoder {
+        override fun encodeURLSafe(bytes: ByteArray): String {
+            return Base64.encodeBase64URLSafeString(bytes)
+        }
+    
         override fun encode(bytes: ByteArray): String {
             return Base64.encodeBase64String(bytes)
         }
     }
 
-    val decoder = object : Base64Decoder {
+    // Base64 decoder using apache commons
+    private val decoder = object : Base64Decoder {
         override fun decode(bytes: ByteArray): ByteArray {
             return Base64.decodeBase64(bytes)
+        }
+    
+        override fun decode(string: String): ByteArray {
+            return Base64.decodeBase64(string)
         }
     }
 ```
