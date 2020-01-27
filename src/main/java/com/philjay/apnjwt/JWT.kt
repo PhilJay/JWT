@@ -73,8 +73,8 @@ object JWT {
         val headerString = jsonEncoder.toJson(header)
         val payloadString = jsonEncoder.toJson(payload)
 
-        val base64Header = encoder.encode(headerString.toByteArray(charset))
-        val base64Payload = encoder.encode(payloadString.toByteArray(charset))
+        val base64Header = encoder.encodeURLSafe(headerString.toByteArray(charset))
+        val base64Payload = encoder.encodeURLSafe(payloadString.toByteArray(charset))
 
         val value = "$base64Header$tokenDelimiter$base64Payload"
 
@@ -121,14 +121,14 @@ object JWT {
      */
     fun verify(jwt: String, jwk: JWKObject, decoder: Base64Decoder, charset: Charset = UTF_8): Boolean {
 
-        val rsa = jwk.toRSA()
+        val rsa = jwk.toRSA(decoder)
 
         return if (rsa == null) {
             false
         } else {
             val parts = jwt.split(tokenDelimiter)
 
-            if(parts.size == 3) {
+            if (parts.size == 3) {
                 val header = decoder.decode(parts[0].toByteArray(charset))
                 val payload = decoder.decode(parts[1].toByteArray(charset))
                 val tokenSignature = decoder.decode(parts[2].toByteArray(charset))
@@ -162,7 +162,7 @@ object JWT {
         algECDSAsha256.initSign(key)
         algECDSAsha256.update(data.toByteArray(charset))
 
-        return encoder.encode(algECDSAsha256.sign())
+        return encoder.encodeURLSafe(algECDSAsha256.sign())
     }
 }
 
@@ -201,6 +201,13 @@ interface JsonDecoder<H : JWTAuthHeader, P : JWTAuthPayload> {
 
 interface Base64Encoder {
     /**
+     * Base64 encodes the provided bytes in an URL safe way.
+     * @param bytes The ByteArray to be encoded.
+     * @return The encoded String.
+     */
+    fun encodeURLSafe(bytes: ByteArray): String
+
+    /**
      * Base64 encodes the provided bytes.
      * @param bytes The ByteArray to be encoded.
      * @return The encoded String.
@@ -215,6 +222,13 @@ interface Base64Decoder {
      * @return The decoded bytes.
      */
     fun decode(bytes: ByteArray): ByteArray
+
+    /**
+     * Base64 encodes the provided String.
+     * @param string The String to be decoded.
+     * @return The decoded String as a ByteArray.
+     */
+    fun decode(string: String): ByteArray
 }
 
 /**
@@ -241,12 +255,13 @@ open class JWKObject(
      * Turns the JWK into an RSA public key.
      * @return A valid RSA public key.
      */
-    open fun toRSA(): PublicKey? {
+    open fun toRSA(decoder: Base64Decoder): PublicKey? {
 
         return try {
             val kf = KeyFactory.getInstance("RSA")
-            val modulus = BigInteger(1, Base64.getDecoder().decode(n))
-            val exponent = BigInteger(1, Base64.getDecoder().decode(e))
+
+            val modulus = BigInteger(1, decoder.decode(n))
+            val exponent = BigInteger(1, decoder.decode(e))
             return kf.generatePublic(RSAPublicKeySpec(modulus, exponent))
         } catch (e: InvalidKeySpecException) {
             e.printStackTrace()
@@ -261,14 +276,14 @@ open class JWKObject(
      * Turns the JWK into an RSA public key in String format.
      * @return A valid RSA public key String.
      */
-    open fun toRSAString(): String? {
+    open fun toRSAString(encoder: Base64Encoder, decoder: Base64Decoder): String? {
 
         return try {
-            val rsa = toRSA() ?: return null
+            val rsa = toRSA(decoder) ?: return null
 
             val kf = KeyFactory.getInstance("RSA")
             val spec: X509EncodedKeySpec = kf.getKeySpec(rsa, X509EncodedKeySpec::class.java)
-            return Base64.getEncoder().encodeToString(spec.encoded)
+            return encoder.encode(spec.encoded)
         } catch (e: InvalidKeySpecException) {
             e.printStackTrace()
             null
