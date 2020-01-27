@@ -120,7 +120,9 @@ In order to verify a JWT, [obtain a JWK (Json Web Key) from Apple](https://devel
 ```kotlin
     val jwk: JWKObject = ... // fetch JWK (public key) from Apple endpoint
     val tokenString = "ey..." // the JWT to validate
-    val valid = JWT.verify(tokenString, jwk, decoder) // turns JWK into RSA public key, returns true if validation is successful
+    
+    // turns JWK into RSA public key, returns true if validation is successful
+    val valid = JWT.verify(tokenString, jwk, decoder) 
 ```
 
 ## Usage with APNs
