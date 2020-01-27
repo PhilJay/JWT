@@ -1,7 +1,7 @@
 [![Release](https://img.shields.io/github/release/PhilJay/JWT.svg?style=flat)](https://jitpack.io/#PhilJay/JWT)
 
 # JWT
-Kotlin JWT implementation (Json Web Token) designed for **Apple**, as required by APNs (Apple Push Notification Service) or Sign in with Apple, for use on Kotlin powered backend servers. Eases the process of creating the token based on your credentials.
+Kotlin JWT implementation (Json Web Token) designed for **Apple**, as required by APNs (Apple Push Notification Service) or Sign in with Apple (including verification via JWK), for use on Kotlin powered backend servers. Eases the process of creating the token based on your credentials.
 
 No other dependencies required.
 
@@ -111,6 +111,16 @@ Use the json decoder to decode your token String:
     val tokenString = "ey..." // a valid JWT as a String
     val token: JWTToken<JWTAuthHeader, JWTAuthPayload>? = JWT.decode(tokenString, jsonDecoder, decoder)
     // conveniently access properties of the token...
+```
+
+## Verifying
+
+In order to verify your JWT, [obtain a JWK (Json Web Key) from Apple](https://developer.apple.com/documentation/signinwithapplerestapi/fetch_apple_s_public_key_for_verifying_token_signature) and use it as a RSA public key for verification: 
+
+```kotlin
+    val jwk: JWKObject = ... // fetch JWK from Apple endpoint
+    val tokenString = "ey..." // the JWT to validate
+    val valid = JWT.verify(tokenString, jwk, decoder) // returns if token is valid
 ```
 
 ## Usage with APNs
