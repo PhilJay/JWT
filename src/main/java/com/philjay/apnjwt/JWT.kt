@@ -1,11 +1,12 @@
 package com.philjay.apnjwt
 
 
-import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.charset.Charset
 import java.security.KeyFactory
 import java.security.Signature
 import java.security.spec.PKCS8EncodedKeySpec
 import java.time.Instant
+import kotlin.text.Charsets.UTF_8
 
 
 object JWT {
@@ -23,6 +24,7 @@ object JWT {
      * @param jsonEncoder: A mapper to transform JWT header and payload to a json String.
      * @param encoder An encoder to base64 encode the JWT header and payload json String.
      * @param decoder A decoder to base64 decode ByteArrays.
+     * @param charset The Charset to use for String to ByteArray encoding, defaults to UTF_8.
      * @return A valid JWT token.
      */
     fun token(
@@ -31,7 +33,8 @@ object JWT {
         secret: String,
         jsonEncoder: JsonEncoder<JWTAuthHeader, JWTAuthPayload>,
         encoder: Base64Encoder,
-        decoder: Base64Decoder
+        decoder: Base64Decoder,
+        charset: Charset = UTF_8
     ): String {
 
         val now = Instant.now().epochSecond // token timestamp in seconds
@@ -39,7 +42,7 @@ object JWT {
         val header = JWTAuthHeader(kid = keyId)
         val payload = JWTAuthPayload(teamId, now)
 
-        return token(header, payload, secret, jsonEncoder, encoder, decoder)
+        return token(header, payload, secret, jsonEncoder, encoder, decoder, charset)
     }
 
     /**
@@ -51,23 +54,23 @@ object JWT {
      * @param jsonEncoder: A mapper to transform JWT header and payload to a json String.
      * @param encoder An encoder to base64 encode the JWT header and payload json String.
      * @param decoder A decoder to base64 decode ByteArrays.
+     * @param charset The Charset to use for String to ByteArray encoding, defaults to UTF_8.
      * @return A valid JWT token.
      */
     fun <H : JWTAuthHeader, P : JWTAuthPayload> token(
         header: H, payload: P, secret: String, jsonEncoder: JsonEncoder<H, P>, encoder: Base64Encoder,
-        decoder: Base64Decoder
+        decoder: Base64Decoder, charset: Charset = UTF_8
     ): String {
 
         val headerString = jsonEncoder.toJson(header)
         val payloadString = jsonEncoder.toJson(payload)
 
-        val charset = UTF_8
         val base64Header = encoder.encode(headerString.toByteArray(charset))
         val base64Payload = encoder.encode(payloadString.toByteArray(charset))
 
         val value = "$base64Header.$base64Payload"
 
-        return value + "." + es256(secret, value, encoder, decoder)
+        return value + "." + es256(secret, value, encoder, decoder, charset)
     }
 
     /**
@@ -75,18 +78,20 @@ object JWT {
      * @param jwtTokenString The JWT token to decode as a String.
      * @param jsonDecoder Mapper to transform the JSON String to JSON objects.
      * @param decoder A decoder to base64 decode ByteArrays.
+     * @param charset The Charset to use for String to ByteArray encoding, defaults to UTF_8.
      * @return JWT token object.
      */
     fun <H : JWTAuthHeader, P : JWTAuthPayload> decode(
         jwtTokenString: String,
         jsonDecoder: JsonDecoder<H, P>,
-        decoder: Base64Decoder
+        decoder: Base64Decoder,
+        charset: Charset = UTF_8
     ): JWTToken<H, P>? {
         val parts = jwtTokenString.split(".")
         return if (parts.size >= 2) {
 
-            val headerJson = decoder.decode(parts[0].toByteArray(UTF_8)).toString(UTF_8)
-            val payloadJson = decoder.decode(parts[1].toByteArray(UTF_8)).toString(UTF_8)
+            val headerJson = decoder.decode(parts[0].toByteArray(charset)).toString(charset)
+            val payloadJson = decoder.decode(parts[1].toByteArray(charset)).toString(charset)
 
             val header: H = jsonDecoder.headerFrom(headerJson)
             val payload: P = jsonDecoder.payloadFrom(payloadJson)
@@ -96,15 +101,21 @@ object JWT {
         }
     }
 
-    private fun es256(secret: String, data: String, encoder: Base64Encoder, decoder: Base64Decoder): String {
+    private fun es256(
+        secret: String,
+        data: String,
+        encoder: Base64Encoder,
+        decoder: Base64Decoder,
+        charset: Charset
+    ): String {
 
         val factory = KeyFactory.getInstance("EC")
-        val keySpec = PKCS8EncodedKeySpec(decoder.decode(secret.toByteArray()))
+        val keySpec = PKCS8EncodedKeySpec(decoder.decode(secret.toByteArray(charset)))
         val key = factory.generatePrivate(keySpec)
 
         val algECDSAsha256 = Signature.getInstance("SHA256withECDSA")
         algECDSAsha256.initSign(key)
-        algECDSAsha256.update(data.toByteArray(UTF_8))
+        algECDSAsha256.update(data.toByteArray(charset))
 
         return encoder.encode(algECDSAsha256.sign())
     }

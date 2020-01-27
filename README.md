@@ -16,7 +16,7 @@ allprojects {
 }
 
 dependencies {
-    implementation 'com.github.PhilJay:JWT:1.0.7'
+    implementation 'com.github.PhilJay:JWT:1.0.8'
 }
 ```
 
@@ -33,7 +33,7 @@ Or add the following to your **pom.xml**:
 <dependency>
     <groupId>com.github.PhilJay</groupId>
     <artifactId>JWT</artifactId>
-    <version>1.0.7</version>
+    <version>1.0.8</version>
 </dependency>
 ```
 
