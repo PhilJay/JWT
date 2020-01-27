@@ -115,12 +115,12 @@ Use the json decoder to decode your token String:
 
 ## Verifying
 
-In order to verify your JWT, [obtain a JWK (Json Web Key) from Apple](https://developer.apple.com/documentation/signinwithapplerestapi/fetch_apple_s_public_key_for_verifying_token_signature) and use it as a RSA public key for verification: 
+In order to verify a JWT, [obtain a JWK (Json Web Key) from Apple](https://developer.apple.com/documentation/signinwithapplerestapi/fetch_apple_s_public_key_for_verifying_token_signature) and use it as a public key for verification: 
 
 ```kotlin
-    val jwk: JWKObject = ... // fetch JWK from Apple endpoint
+    val jwk: JWKObject = ... // fetch JWK (public key) from Apple endpoint
     val tokenString = "ey..." // the JWT to validate
-    val valid = JWT.verify(tokenString, jwk, decoder) // returns if token is valid
+    val valid = JWT.verify(tokenString, jwk, decoder) // turns JWK into RSA public key, returns true if validation is successful
 ```
 
 ## Usage with APNs
