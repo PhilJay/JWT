@@ -1,11 +1,18 @@
 package com.philjay.apnjwt
 
 
+import java.math.BigInteger
 import java.nio.charset.Charset
 import java.security.KeyFactory
+import java.security.NoSuchAlgorithmException
+import java.security.PublicKey
 import java.security.Signature
+import java.security.spec.InvalidKeySpecException
 import java.security.spec.PKCS8EncodedKeySpec
+import java.security.spec.RSAPublicKeySpec
+import java.security.spec.X509EncodedKeySpec
 import java.time.Instant
+import java.util.*
 import kotlin.text.Charsets.UTF_8
 
 
@@ -14,6 +21,7 @@ object JWT {
      * The encryption algorithm to be used to encrypt the token.
      */
     const val algorithm = "ES256"
+    private const val tokenDelimiter = "."
 
     /**
      * Generates a JWT token as per Apple's specifications. Does not include the required "bearer" prefix.
@@ -68,9 +76,9 @@ object JWT {
         val base64Header = encoder.encode(headerString.toByteArray(charset))
         val base64Payload = encoder.encode(payloadString.toByteArray(charset))
 
-        val value = "$base64Header.$base64Payload"
+        val value = "$base64Header$tokenDelimiter$base64Payload"
 
-        return value + "." + es256(secret, value, encoder, decoder, charset)
+        return value + tokenDelimiter + es256(secret, value, encoder, decoder, charset)
     }
 
     /**
@@ -87,7 +95,7 @@ object JWT {
         decoder: Base64Decoder,
         charset: Charset = UTF_8
     ): JWTToken<H, P>? {
-        val parts = jwtTokenString.split(".")
+        val parts = jwtTokenString.split(tokenDelimiter)
         return if (parts.size >= 2) {
 
             val headerJson = decoder.decode(parts[0].toByteArray(charset)).toString(charset)
@@ -95,9 +103,46 @@ object JWT {
 
             val header: H = jsonDecoder.headerFrom(headerJson)
             val payload: P = jsonDecoder.payloadFrom(payloadJson)
-            JWTToken(header, payload)
+
+            if (parts.size == 3) {
+                val signature = decoder.decode(parts[2].toByteArray(charset))
+                JWTToken(header, payload, signature)
+            } else {
+                JWTToken(header, payload)
+            }
         } else {
             null
+        }
+    }
+
+    /**
+     * Verifies the provided JWT String with the provided JWK object.
+     * @return True if validation was successful, false if not.
+     */
+    fun verify(jwt: String, jwk: JWKObject, decoder: Base64Decoder, charset: Charset = UTF_8): Boolean {
+
+        val rsa = jwk.toRSA()
+
+        return if (rsa == null) {
+            false
+        } else {
+            val parts = jwt.split(tokenDelimiter)
+
+            if(parts.size == 3) {
+                val header = decoder.decode(parts[0].toByteArray(charset))
+                val payload = decoder.decode(parts[1].toByteArray(charset))
+                val tokenSignature = decoder.decode(parts[2].toByteArray(charset))
+
+                val rsaSignature = Signature.getInstance("RSA")
+                rsaSignature.initVerify(rsa)
+                rsaSignature.update(header)
+                rsaSignature.update(tokenDelimiter.toByte())
+                rsaSignature.update(payload)
+                rsaSignature.verify(tokenSignature)
+                true
+            } else {
+                false
+            }
         }
     }
 
@@ -175,7 +220,64 @@ interface Base64Decoder {
 /**
  * JWTToken representation with header and payload. Used for String token decoding.
  */
-open class JWTToken<H : JWTAuthHeader, P : JWTAuthPayload>(val header: H, val payload: P)
+open class JWTToken<H : JWTAuthHeader, P : JWTAuthPayload>(
+    val header: H,
+    val payload: P,
+    val signature: ByteArray? = null
+)
+
+/**
+ * An object representing a Json Web Key (JWK).
+ */
+open class JWKObject(
+    val kty: String,
+    val kid: String,
+    val use: String,
+    val alg: String,
+    val n: String,
+    val e: String
+) {
+    /**
+     * Turns the JWK into an RSA public key.
+     * @return A valid RSA public key.
+     */
+    open fun toRSA(): PublicKey? {
+
+        return try {
+            val kf = KeyFactory.getInstance("RSA")
+            val modulus = BigInteger(1, Base64.getDecoder().decode(n))
+            val exponent = BigInteger(1, Base64.getDecoder().decode(e))
+            return kf.generatePublic(RSAPublicKeySpec(modulus, exponent))
+        } catch (e: InvalidKeySpecException) {
+            e.printStackTrace()
+            null
+        } catch (e: NoSuchAlgorithmException) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    /**
+     * Turns the JWK into an RSA public key in String format.
+     * @return A valid RSA public key String.
+     */
+    open fun toRSAString(): String? {
+
+        return try {
+            val rsa = toRSA() ?: return null
+
+            val kf = KeyFactory.getInstance("RSA")
+            val spec: X509EncodedKeySpec = kf.getKeySpec(rsa, X509EncodedKeySpec::class.java)
+            return Base64.getEncoder().encodeToString(spec.encoded)
+        } catch (e: InvalidKeySpecException) {
+            e.printStackTrace()
+            null
+        } catch (e: NoSuchAlgorithmException) {
+            e.printStackTrace()
+            null
+        }
+    }
+}
 
 /**
  * JWT Authentication token header.
