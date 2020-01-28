@@ -116,10 +116,13 @@ object JWT {
     }
 
     /**
-     * Verifies the provided JWT String with the provided JWK object.
+     * Verifies the provided JWT String with the provided JWK object (public key).
+     * @param jwt: The JWK String to validate.
+     * @param jwk: The Json Web Key (public key) obtained from Apple for validation.
+     * @param decoder: Base64 decoder for decoding the JWT signature.
      * @return True if validation was successful, false if not.
      */
-    fun verify(jwt: String, jwk: JWKObject, decoder: Base64Decoder, algorithm: String = verifyAlgorithm, charset: Charset = UTF_8): Boolean {
+    fun verify(jwt: String, jwk: JWKObject, decoder: Base64Decoder, charset: Charset = UTF_8): Boolean {
 
         val rsa = jwk.toRSA(decoder)
 
@@ -133,7 +136,7 @@ object JWT {
                 val payload = parts[1].toByteArray(charset)
                 val tokenSignature = decoder.decode(parts[2])
 
-                val rsaSignature = Signature.getInstance(algorithm)
+                val rsaSignature = Signature.getInstance(verifyAlgorithm)
                 rsaSignature.initVerify(rsa)
                 rsaSignature.update(header)
                 rsaSignature.update(tokenDelimiter.toByte())
