@@ -1,4 +1,4 @@
-package com.philjay.apnjwt
+package com.philjay.jwt
 
 
 import java.math.BigInteger
@@ -16,11 +16,10 @@ import kotlin.text.Charsets.UTF_8
 
 
 object JWT {
-    /**
-     * The encryption algorithm to be used to encrypt the token.
-     */
-    const val algorithm = "ES256"
+
     private const val verifyAlgorithm = "SHA256withRSA"
+    private const val tokenSignatureAlgorithm = "SHA256withECDSA"
+    private const val keyAlgorithm = "EC"
     private const val tokenDelimiter = '.'
 
     /**
@@ -156,11 +155,11 @@ object JWT {
         charset: Charset
     ): String {
 
-        val factory = KeyFactory.getInstance("EC")
+        val factory = KeyFactory.getInstance(keyAlgorithm)
         val keySpec = PKCS8EncodedKeySpec(decoder.decode(secret.toByteArray(charset)))
         val key = factory.generatePrivate(keySpec)
 
-        val algECDSAsha256 = Signature.getInstance("SHA256withECDSA")
+        val algECDSAsha256 = Signature.getInstance(tokenSignatureAlgorithm)
         algECDSAsha256.initSign(key)
         algECDSAsha256.update(data.toByteArray(charset))
 
@@ -301,7 +300,7 @@ open class JWKObject(
  */
 open class JWTAuthHeader(
     /** the encryption algorithm used, defaults to ES256 */
-    val alg: String = JWT.algorithm,
+    val alg: String = "ES256",
     /** the key identifier (found when generating private key) */
     val kid: String
 )
