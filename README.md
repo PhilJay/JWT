@@ -109,8 +109,10 @@ If you want to decode a JWT String, create a JSON decoder:
 Use the json decoder to decode your token String:
 ```kotlin
     val tokenString = "ey..." // a valid JWT as a String
-    val token: JWTToken<JWTAuthHeader, JWTAuthPayload>? = JWT.decode(tokenString, jsonDecoder, decoder)
+    val t: JWTToken<JWTAuthHeader, JWTAuthPayload>? = JWT.decode(tokenString, jsonDecoder, decoder)
+    
     // conveniently access properties of the token...
+    val issuer = t?.payload?.iss
 ```
 
 ## Verifying
