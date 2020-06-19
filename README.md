@@ -100,7 +100,7 @@ If you want to decode a JWT String, create a JSON decoder:
             return gson.fromJson(json, JWTAuthHeader::class.java)
         }
 
-        override fun palyoadFrom(json: String): JWTAuthPayload {
+        override fun payloadFrom(json: String): JWTAuthPayload {
             return gson.fromJson(json, JWTAuthPayload::class.java)
         }
     }
