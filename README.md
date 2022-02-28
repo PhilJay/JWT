@@ -5,6 +5,10 @@ Lightweight Kotlin JWT implementation (Json Web Token) designed for **Apple**, a
 
 No other dependencies required.
 
+## Algorithms supported
+ - ES256
+ - RS256
+
 ## Dependency 
 
 Add the following to your **build.gradle** file:
@@ -16,7 +20,7 @@ allprojects {
 }
 
 dependencies {
-    implementation 'com.github.PhilJay:JWT:1.1.5'
+    implementation 'com.github.PhilJay:JWT:1.2.0'
 }
 ```
 
@@ -33,7 +37,7 @@ Or add the following to your **pom.xml**:
 <dependency>
     <groupId>com.github.PhilJay</groupId>
     <artifactId>JWT</artifactId>
-    <version>1.1.5</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 
@@ -78,15 +82,18 @@ Create required encoders, decoders and JSON Mapper (e.g. Gson or equivalent). Th
     }
 ```
 
-Create the token by providing your teamId, keyId and secret (private key excluding header and footer). The teamId can be obtained from the developer member center. The keyId can be obtained when you create your secret (private key).
+Create the Apple JWT token by providing your teamId, keyId and secret (private key excluding header and footer). The teamId can be obtained from the developer member center. The keyId can be obtained when you create your secret (private key).
 
 ```kotlin
-    val token = JWT.token("teamId", "keyId", "secret", jsonEncoder, encoder, decoder)
+    val token = JWT.tokenApple("teamId", "keyId", "secret", jsonEncoder, encoder, decoder)
+```
 
-    // or...
+Create any JWT token by providing the required algorithm, header, payload and secret (private key):
+
+```kotlin
     val header = JWTAuthHeader(...)
     val payload = JWTAuthPayload(...)
-    val token = JWT.token(header, payload, "secret", jsonEncoder, encoder, decoder)
+    val token = JWT.token(Algorithm.ES256, header, payload, "secret", jsonEncoder, encoder, decoder)
 ```
 
 ## Decoding JWT

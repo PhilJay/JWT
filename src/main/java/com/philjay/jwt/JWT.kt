@@ -16,10 +16,7 @@ import kotlin.text.Charsets.UTF_8
 
 
 object JWT {
-
     private const val verifyAlgorithm = "SHA256withRSA"
-    private const val tokenSignatureAlgorithm = "SHA256withECDSA"
-    private const val keyAlgorithm = "EC"
     private const val tokenDelimiter = '.'
 
     /**
@@ -27,18 +24,18 @@ object JWT {
      *
      * @param teamId The team identifier (can be obtained from the developer console member center)
      * @param keyId  The key identifier (can be obtained when generating your private key)
-     * @param secret The private key (without the header and the footer - as in (BEGIN KEY...)
+     * @param secret The private key (without the header and the footer - as in BEGIN KEY...)
      * @param jsonEncoder: A mapper to transform JWT header and payload to a json String.
      * @param encoder An encoder to base64 encode the JWT header and payload json String.
      * @param decoder A decoder to base64 decode ByteArrays.
      * @param charset The Charset to use for String to ByteArray encoding, defaults to UTF_8.
      * @return A valid JWT token.
      */
-    fun token(
+    fun tokenApple(
         teamId: String,
         keyId: String,
         secret: String,
-        jsonEncoder: JsonEncoder<JWTAuthHeader, JWTAuthPayload>,
+        jsonEncoder: JsonEncoder<AppleJWTAuthHeader, JWTAuthPayload>,
         encoder: Base64Encoder,
         decoder: Base64Decoder,
         charset: Charset = UTF_8
@@ -46,18 +43,19 @@ object JWT {
 
         val now = Instant.now().epochSecond // token timestamp in seconds
 
-        val header = JWTAuthHeader(kid = keyId)
+        val header = AppleJWTAuthHeader(kid = keyId)
         val payload = JWTAuthPayload(teamId, now)
 
-        return token(header, payload, secret, jsonEncoder, encoder, decoder, charset)
+        return token(Algorithm.ES256, header, payload, secret, jsonEncoder, encoder, decoder, charset)
     }
 
     /**
-     * Generates a JWT token as per Apple's specifications. Does not include the required "bearer" prefix.
+     * Generates a JWT token String.
      *
+     * @param algorithm The algorithm to use.
      * @param header The auth header usually containing algorithm and key id.
      * @param payload The payload usually containing at least the team id and timestamp.
-     * @param secret The private key (without the header and the footer - as in (BEGIN KEY...)
+     * @param secret The private key (without the header and the footer - as in BEGIN KEY...)
      * @param jsonEncoder: A mapper to transform JWT header and payload to a json String.
      * @param encoder An encoder to base64 encode the JWT header and payload json String.
      * @param decoder A decoder to base64 decode ByteArrays.
@@ -65,6 +63,7 @@ object JWT {
      * @return A valid JWT token.
      */
     fun <H : JWTAuthHeader, P : JWTAuthPayload> token(
+        algorithm: Algorithm,
         header: H, payload: P, secret: String, jsonEncoder: JsonEncoder<H, P>, encoder: Base64Encoder,
         decoder: Base64Decoder, charset: Charset = UTF_8
     ): String {
@@ -77,7 +76,7 @@ object JWT {
 
         val value = "$base64Header$tokenDelimiter$base64Payload"
 
-        return value + tokenDelimiter + es256(secret, value, encoder, decoder, charset)
+        return value + tokenDelimiter + sign(algorithm, secret, value, encoder, decoder, charset)
     }
 
     /**
@@ -115,9 +114,9 @@ object JWT {
     }
 
     /**
-     * Verifies the provided JWT String with the provided JWK object (public key).
+     * Verifies the provided JWT String with the provided JWK object (RSA public key).
      * @param jwt: The JWK String to validate.
-     * @param jwk: The Json Web Key (public key) obtained from Apple for validation.
+     * @param jwk: The Json Web Key (RSA public key) obtained from Apple for validation.
      * @param decoder: Base64 decoder for decoding the JWT signature.
      * @return True if validation was successful, false if not.
      */
@@ -147,7 +146,8 @@ object JWT {
         }
     }
 
-    private fun es256(
+    private fun sign(
+        algorithm: Algorithm,
         secret: String,
         data: String,
         encoder: Base64Encoder,
@@ -155,16 +155,20 @@ object JWT {
         charset: Charset
     ): String {
 
-        val factory = KeyFactory.getInstance(keyAlgorithm)
+        val factory = KeyFactory.getInstance(algorithm.keyAlg)
         val keySpec = PKCS8EncodedKeySpec(decoder.decode(secret.toByteArray(charset)))
         val key = factory.generatePrivate(keySpec)
 
-        val algECDSAsha256 = Signature.getInstance(tokenSignatureAlgorithm)
-        algECDSAsha256.initSign(key)
-        algECDSAsha256.update(data.toByteArray(charset))
+        val sig = Signature.getInstance(algorithm.alg)
+        sig.initSign(key)
+        sig.update(data.toByteArray(charset))
 
-        return encoder.encodeURLSafe(algECDSAsha256.sign())
+        return encoder.encodeURLSafe(sig.sign())
     }
+}
+
+enum class Algorithm(val alg: String, val keyAlg: String) {
+    ES256("SHA256withECDSA", "EC"), RS256("SHA256withRSA", "RSA")
 }
 
 /**
@@ -299,11 +303,19 @@ open class JWKObject(
  * JWT Authentication token header.
  */
 open class JWTAuthHeader(
+    /** the encryption algorithm used */
+    val alg: String
+)
+
+/**
+ * JWT Authentication token header for Apple.
+ */
+class AppleJWTAuthHeader(
     /** the encryption algorithm used, defaults to ES256 */
-    val alg: String = "ES256",
+    alg: String = Algorithm.ES256.name,
     /** the key identifier (found when generating private key) */
     val kid: String
-)
+) : JWTAuthHeader(alg)
 
 /**
  * JWT authentication token payload.

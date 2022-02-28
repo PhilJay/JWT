@@ -4,7 +4,7 @@ plugins {
 }
 
 group 'com.philjay.jwt'
-version '1.1.5'
+version '1.2.0'
 
 sourceCompatibility = 1.8
 
@@ -16,7 +16,7 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
     testCompile group: 'junit', name: 'junit', version: '4.12'
 
-    testCompile 'com.google.code.gson:gson:2.8.6'
+    testCompile 'com.google.code.gson:gson:2.9.0'
     testCompile 'commons-codec:commons-codec:1.14'
 }
 
