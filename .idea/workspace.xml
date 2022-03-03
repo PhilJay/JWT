@@ -46,7 +46,7 @@
   <component name="PropertiesComponent">
     <property name="WebServerToolWindowFactoryState" value="false" />
     <property name="last_opened_file_path" value="$PROJECT_DIR$" />
-    <property name="project.structure.last.edited" value="Modules" />
+    <property name="project.structure.last.edited" value="SDKs" />
     <property name="project.structure.proportion" value="0.0" />
     <property name="project.structure.side.proportion" value="0.2" />
     <property name="settings.editor.selected.configurable" value="reference.settingsdialog.project.gradle" />
@@ -127,6 +127,7 @@
       <workItem from="1580198778394" duration="73000" />
       <workItem from="1580198880216" duration="3739000" />
       <workItem from="1646058684704" duration="3926000" />
+      <workItem from="1646302868074" duration="708000" />
     </task>
     <servers />
   </component>
