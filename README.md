@@ -11,6 +11,8 @@ No other dependencies required.
 
 ## Dependency 
 
+Requires **Java 14**.
+
 Add the following to your **build.gradle** file:
 ```groovy
 allprojects {
@@ -20,7 +22,7 @@ allprojects {
 }
 
 dependencies {
-    implementation 'com.github.PhilJay:JWT:1.2.0'
+    implementation 'com.github.PhilJay:JWT:1.2.6'
 }
 ```
 
@@ -37,7 +39,7 @@ Or add the following to your **pom.xml**:
 <dependency>
     <groupId>com.github.PhilJay</groupId>
     <artifactId>JWT</artifactId>
-    <version>1.2.0</version>
+    <version>1.2.6</version>
 </dependency>
 ```
 
