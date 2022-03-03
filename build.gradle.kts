@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.philjay.jwt"
-version = "1.2.2"
+version = "1.2.3"
 description = "JWT"
 java.sourceCompatibility = JavaVersion.VERSION_14
 
