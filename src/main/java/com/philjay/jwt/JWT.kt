@@ -137,7 +137,7 @@ object JWT {
                 val rsaSignature = Signature.getInstance(verifyAlgorithm)
                 rsaSignature.initVerify(rsa)
                 rsaSignature.update(header)
-                rsaSignature.update(tokenDelimiter.toByte())
+                rsaSignature.update(tokenDelimiter.code.toByte())
                 rsaSignature.update(payload)
                 rsaSignature.verify(tokenSignature)
             } else {

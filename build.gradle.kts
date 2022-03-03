@@ -4,10 +4,26 @@ plugins {
     kotlin("jvm") version "1.6.0"
 }
 
-group = "com.philjay.jwt"
-version = "1.2.3"
-description = "JWT"
+val g = "com.philjay.jwt"
+val v = "1.2.4"
+val desc = "JWT"
+
+group = g
+version = v
+description = desc
 java.sourceCompatibility = JavaVersion.VERSION_14
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            groupId = g
+            artifactId = desc
+            version = v
+
+            from(components["java"])
+        }
+    }
+}
 
 repositories {
     mavenLocal()
