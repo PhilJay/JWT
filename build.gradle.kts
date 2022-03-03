@@ -5,7 +5,7 @@ plugins {
 }
 
 val g = "com.philjay.jwt"
-val v = "1.2.4"
+val v = "1.2.6"
 val desc = "JWT"
 
 group = g
