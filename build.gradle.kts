@@ -15,11 +15,7 @@ java.sourceCompatibility = JavaVersion.VERSION_14
 
 publishing {
     publications {
-        create<MavenPublication>("maven") {
-            groupId = g
-            artifactId = desc
-            version = v
-
+        create<MavenPublication>(desc) {
             from(components["java"])
         }
     }
