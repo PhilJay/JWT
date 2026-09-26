@@ -1,194 +1,206 @@
 import com.google.gson.GsonBuilder
 import com.philjay.jwt.*
-import org.apache.commons.codec.binary.Base64
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.security.KeyPair
+import java.security.KeyPairGenerator
+import java.security.spec.ECGenParameterSpec
+import java.time.Clock
+import java.time.Duration
 import java.time.Instant
+import java.time.ZoneOffset
+import java.util.Base64
+
+class CustomPayload(
+    val name: String,
+    iss: String? = null,
+    iat: Long? = null,
+    exp: Long? = null,
+    nbf: Long? = null,
+    aud: String? = null,
+    sub: String? = null
+) : JWTAuthPayload(iss, iat, exp, nbf, aud, sub)
 
 class JWTTest {
 
     private val gson = GsonBuilder().create()
 
-    private val jsonEncoder = object : JsonEncoder<JWTAuthHeader, CustomJWTAuthPayload> {
-        override fun toJson(header: JWTAuthHeader): String {
-            return gson.toJson(header, JWTAuthHeader::class.java)
-        }
-
-        override fun toJson(payload: CustomJWTAuthPayload): String {
-            return gson.toJson(payload, CustomJWTAuthPayload::class.java)
-        }
+    private val jsonEncoder = object : JsonEncoder<JWTAuthHeader, CustomPayload> {
+        override fun toJson(header: JWTAuthHeader): String = gson.toJson(header)
+        override fun toJson(payload: CustomPayload): String = gson.toJson(payload)
     }
 
-    private val jsonDecoder = object : JsonDecoder<JWTAuthHeader, CustomJWTAuthPayload> {
-
-        override fun headerFrom(json: String): JWTAuthHeader {
-            return gson.fromJson(json, JWTAuthHeader::class.java)
-        }
-
-        override fun payloadFrom(json: String): CustomJWTAuthPayload {
-            return gson.fromJson(json, CustomJWTAuthPayload::class.java)
-        }
-    }
-    private val appleJsonDecoder = object : JsonDecoder<AppleJWTAuthHeader, CustomJWTAuthPayload> {
-
-        override fun headerFrom(json: String): AppleJWTAuthHeader {
-            return gson.fromJson(json, AppleJWTAuthHeader::class.java)
-        }
-
-        override fun payloadFrom(json: String): CustomJWTAuthPayload {
-            return gson.fromJson(json, CustomJWTAuthPayload::class.java)
-        }
+    private val jsonDecoder = object : JsonDecoder<JWTAuthHeader, CustomPayload> {
+        override fun headerFrom(json: String): JWTAuthHeader = gson.fromJson(json, JWTAuthHeader::class.java)
+        override fun payloadFrom(json: String): CustomPayload = gson.fromJson(json, CustomPayload::class.java)
     }
 
-    private val encoder = object : Base64Encoder {
-        override fun encodeURLSafe(bytes: ByteArray): String {
-            return Base64.encodeBase64URLSafeString(bytes)
-        }
-
-        override fun encode(bytes: ByteArray): String {
-            return Base64.encodeBase64String(bytes)
-        }
+    private val appleEncoder = object : JsonEncoder<AppleJWTAuthHeader, JWTAuthPayload> {
+        override fun toJson(header: AppleJWTAuthHeader): String = gson.toJson(header)
+        override fun toJson(payload: JWTAuthPayload): String = gson.toJson(payload)
     }
 
-    private val decoder = object : Base64Decoder {
-        override fun decode(bytes: ByteArray): ByteArray {
-            return Base64.decodeBase64(bytes)
-        }
-
-        override fun decode(string: String): ByteArray {
-            return Base64.decodeBase64(string)
-        }
+    private val appleDecoder = object : JsonDecoder<AppleJWTAuthHeader, AppleIdentityTokenPayload> {
+        override fun headerFrom(json: String): AppleJWTAuthHeader = gson.fromJson(json, AppleJWTAuthHeader::class.java)
+        override fun payloadFrom(json: String): AppleIdentityTokenPayload =
+            gson.fromJson(json, AppleIdentityTokenPayload::class.java)
     }
+
+    private val now = 1_750_000_000L
+    private val clock = Clock.fixed(Instant.ofEpochSecond(now), ZoneOffset.UTC)
+
+    private val rsaKeys = keyPair("RSA", 2048)
+    private val ecKeys = ecKeyPair("secp256r1")
+    private val jwks = listOf(
+        JWKObject.fromPublicKey(rsaKeys.public, Algorithm.RS256, kid = "rsa"),
+        JWKObject.fromPublicKey(ecKeys.public, Algorithm.ES256, kid = "ec")
+    )
+    private val validation = JWTValidation(issuer = "issuer", audiences = setOf("client"))
+
+    private fun keyPair(type: String, size: Int): KeyPair =
+        KeyPairGenerator.getInstance(type).apply { initialize(size) }.generateKeyPair()
+
+    private fun ecKeyPair(curve: String): KeyPair =
+        KeyPairGenerator.getInstance("EC").apply { initialize(ECGenParameterSpec(curve)) }.generateKeyPair()
+
+    private fun pem(keys: KeyPair): String =
+        "-----BEGIN PRIVATE KEY-----\n" +
+                Base64.getMimeEncoder(64, "\n".toByteArray()).encodeToString(keys.private.encoded) +
+                "\n-----END PRIVATE KEY-----\n"
+
+    private fun token(
+        payload: CustomPayload = CustomPayload("n", iss = "issuer", iat = now, exp = now + 600, aud = "client"),
+        algorithm: Algorithm = Algorithm.RS256,
+        kid: String = "rsa"
+    ): String {
+        val keys = if (algorithm == Algorithm.RS256) rsaKeys else ecKeys
+        return JWT.token(algorithm, JWTAuthHeader(algorithm.name, kid), payload, keys.private, jsonEncoder)
+    }
+
+    private fun verify(jwt: String) = JWT.verify(jwt, jwks, jsonDecoder, validation, clock)
+
+    private fun errorOf(jwt: String) = (verify(jwt) as? JWTVerificationResult.Invalid)?.error
 
     @Test
     fun testDecode() {
-
         // dummy Apple JWT created with jwt.io
         val jwt =
             "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IkFCQ0RFRkcifQ.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMiwiaXNzIjoiSkFORSJ9.aWXZy39-nV3chKPGeX8SZnK7PwuqRGxCThrvN955M0Ne4xcd7RJJyoSQEPjbok4MD2PMP7UPquPTYylYRCbsbQ"
 
-        val jwtObject = JWT.decode(jwt, appleJsonDecoder, decoder)
+        val token = JWT.decode(jwt, jsonDecoder)
 
-        assertNotNull(jwtObject)
-        assertEquals("ES256", jwtObject?.header?.alg)
-        assertEquals("ABCDEFG", jwtObject?.header?.kid)
-
-        assertEquals("1234567890", jwtObject?.payload?.sub)
-        assertEquals("John Doe", jwtObject?.payload?.name)
-        assertEquals(1516239022L, jwtObject?.payload?.iat)
-        assertEquals("JANE", jwtObject?.payload?.iss)
+        assertNotNull(token)
+        assertEquals("ES256", token?.header?.alg)
+        assertEquals("ABCDEFG", token?.header?.kid)
+        assertEquals("1234567890", token?.payload?.sub)
+        assertEquals("John Doe", token?.payload?.name)
+        assertEquals(1516239022L, token?.payload?.iat)
+        assertEquals("JANE", token?.payload?.iss)
+        assertNull(JWT.decode("$jwt.extra", jsonDecoder))
     }
 
     @Test
-    fun testTokenApple() {
+    fun testAppleTokens() {
+        val apns = JWT.tokenApple("teamId", "keyId", pem(ecKeys), appleEncoder, clock)
 
-        val jsonEncoder = object : JsonEncoder<AppleJWTAuthHeader, JWTAuthPayload> {
-            override fun toJson(header: AppleJWTAuthHeader): String {
-                return gson.toJson(header, AppleJWTAuthHeader::class.java)
-            }
+        assertTrue(JWT.verifySignature(apns, ecKeys.public, Algorithm.ES256))
+        assertEquals(64, Base64.getUrlDecoder().decode(apns.substringAfterLast('.')).size)
+        val apnsToken = JWT.decode(apns, appleDecoder)!!
+        assertEquals("keyId", apnsToken.header.kid)
+        assertEquals("teamId", apnsToken.payload.iss)
+        assertEquals(now, apnsToken.payload.iat)
+        assertNull(apnsToken.payload.exp)
 
-            override fun toJson(payload: JWTAuthPayload): String {
-                return gson.toJson(payload, JWTAuthPayload::class.java)
-            }
+        val secret = JWT.appleClientSecret("teamId", "keyId", "com.example.app", ecKeys.private, appleEncoder, clock = clock)
+        val secretToken = JWT.decode(secret, appleDecoder)!!
+        assertEquals(JWT.APPLE_ISSUER, secretToken.payload.aud)
+        assertEquals("com.example.app", secretToken.payload.sub)
+        assertEquals(now + 3600, secretToken.payload.exp)
+        assertThrows(IllegalArgumentException::class.java) {
+            JWT.appleClientSecret("t", "k", "c", ecKeys.private, appleEncoder, expiresIn = Duration.ofDays(200))
         }
+    }
 
-        val nowSeconds = Instant.now().epochSecond
-        // dummy key created in Apple dev console (without header & footer)
-        val secret = "MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgofYVrV6I5TvcM1Gc\n" +
-                "TxiNYa/K30VltjNMg0bupcr9VfagCgYIKoZIzj0DAQehRANCAATc/L5AvAOgsTM5\n" +
-                "h07NRuxi4rU4JWVO7md6wTiJQS3SkMAiyzvSmMXCPf6x6tKyQeppM0jI7XWz+cjo\n" +
-                "Q3raiQbh"
+    @Test
+    fun testVerifyAcceptsValidTokens() {
+        val rs256 = verify(token())
+        assertTrue(rs256.isValid)
+        assertEquals("n", rs256.tokenOrNull()?.payload?.name)
 
-        val jwtString = JWT.tokenApple(
-            teamId = "teamId",
-            keyId = "keyId",
-            secret = secret,
-            jsonEncoder = jsonEncoder,
-            encoder = encoder,
-            decoder = decoder
+        assertTrue(verify(token(algorithm = Algorithm.ES256, kid = "ec")).isValid)
+
+        val expiredWithinLeeway = CustomPayload("n", iss = "issuer", exp = now - 30, aud = "client")
+        assertTrue(verify(token(expiredWithinLeeway)).isValid)
+    }
+
+    @Test
+    fun testVerifyRejectsForgedTokens() {
+        val valid = token()
+        val (header, _, signature) = valid.split('.')
+        val otherPayload = Base64Url(gson.toJson(CustomPayload("admin", iss = "issuer", exp = now + 600, aud = "client")))
+
+        assertEquals(JWTVerificationError.INVALID_SIGNATURE, errorOf("$header.$otherPayload.$signature"))
+        assertEquals(JWTVerificationError.UNSUPPORTED_ALGORITHM, errorOf("${Base64Url("""{"alg":"none"}""")}.$otherPayload."))
+        assertEquals(JWTVerificationError.NO_MATCHING_KEY, errorOf(token(kid = "unknown")))
+        assertEquals(JWTVerificationError.NO_MATCHING_KEY, errorOf(token(kid = "ec")))
+        assertEquals(JWTVerificationError.MALFORMED, errorOf("$header.$otherPayload"))
+        assertEquals(JWTVerificationError.MALFORMED, errorOf(sameBytesOtherString(token(algorithm = Algorithm.ES256, kid = "ec"))))
+        assertFalse(JWT.verifySignature(valid, ecKeys.public, Algorithm.ES256))
+
+        val weakRsa = keyPair("RSA", 1024)
+        assertThrows(IllegalArgumentException::class.java) {
+            JWT.token(Algorithm.RS256, JWTAuthHeader("RS256"), CustomPayload("n"), weakRsa.private, jsonEncoder)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            JWT.token(Algorithm.RS256, JWTAuthHeader("ES256"), CustomPayload("n"), rsaKeys.private, jsonEncoder)
+        }
+    }
+
+    @Test
+    fun testVerifyChecksClaims() {
+        fun errorFor(payload: CustomPayload) = errorOf(token(payload))
+
+        assertEquals(JWTVerificationError.EXPIRED, errorFor(CustomPayload("n", iss = "issuer", exp = now - 61, aud = "client")))
+        assertEquals(JWTVerificationError.MISSING_EXPIRATION, errorFor(CustomPayload("n", iss = "issuer", aud = "client")))
+        assertEquals(JWTVerificationError.NOT_YET_VALID, errorFor(CustomPayload("n", iss = "issuer", exp = now + 600, nbf = now + 300, aud = "client")))
+        assertEquals(JWTVerificationError.ISSUED_IN_FUTURE, errorFor(CustomPayload("n", iss = "issuer", iat = now + 300, exp = now + 600, aud = "client")))
+        assertEquals(JWTVerificationError.INVALID_ISSUER, errorFor(CustomPayload("n", iss = "other", exp = now + 600, aud = "client")))
+        assertEquals(JWTVerificationError.INVALID_AUDIENCE, errorFor(CustomPayload("n", iss = "issuer", exp = now + 600, aud = "other-app")))
+    }
+
+    @Test
+    fun testVerifyApple() {
+        val payload = AppleIdentityTokenPayload(
+            iss = JWT.APPLE_ISSUER, iat = now, exp = now + 600, aud = "com.example.app", sub = "user", nonce = "abc"
         )
-        assertNotNull(jwtString)
+        val encoder = object : JsonEncoder<JWTAuthHeader, AppleIdentityTokenPayload> {
+            override fun toJson(header: JWTAuthHeader): String = gson.toJson(header)
+            override fun toJson(payload: AppleIdentityTokenPayload): String = gson.toJson(payload)
+        }
+        val identityToken = JWT.token(Algorithm.RS256, JWTAuthHeader("RS256", "rsa"), payload, rsaKeys.private, encoder)
+        val clientIds = setOf("com.example.app")
 
-        val jwtObject = JWT.decode(jwtString, appleJsonDecoder, decoder)
+        val result = JWT.verifyApple(identityToken, jwks, clientIds, appleDecoder, nonce = "abc", clock = clock)
+        assertEquals("user", result.tokenOrNull()?.payload?.sub)
 
-        assertNotNull(jwtObject)
-        assertEquals("ES256", jwtObject?.header?.alg)
-        assertEquals("keyId", jwtObject?.header?.kid)
+        val wrongNonce = JWT.verifyApple(identityToken, jwks, clientIds, appleDecoder, nonce = "xyz", clock = clock)
+        assertEquals(JWTVerificationError.INVALID_NONCE, (wrongNonce as JWTVerificationResult.Invalid).error)
 
-        assertEquals(nowSeconds, jwtObject?.payload?.iat)
-        assertEquals("teamId", jwtObject?.payload?.iss)
+        val otherApp = JWT.verifyApple(identityToken, jwks, setOf("com.other.app"), appleDecoder, clock = clock)
+        assertEquals(JWTVerificationError.INVALID_AUDIENCE, (otherApp as JWTVerificationResult.Invalid).error)
     }
 
-    @Test
-    fun testEncodeDecodeEC256() {
+    private fun Base64Url(json: String): String = Base64.getUrlEncoder().withoutPadding().encodeToString(json.toByteArray())
 
-        val nowSeconds = Instant.now().epochSecond
-        val expSeconds = nowSeconds + 3600
-
-        // dummy key created in Apple dev console (without header & footer)
-        val secret = "MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQgofYVrV6I5TvcM1Gc\n" +
-                "TxiNYa/K30VltjNMg0bupcr9VfagCgYIKoZIzj0DAQehRANCAATc/L5AvAOgsTM5\n" +
-                "h07NRuxi4rU4JWVO7md6wTiJQS3SkMAiyzvSmMXCPf6x6tKyQeppM0jI7XWz+cjo\n" +
-                "Q3raiQbh"
-
-        val header = JWTAuthHeader(alg = Algorithm.ES256.name) // dummy key id
-
-        val payload = CustomJWTAuthPayload("com.philjay.jwt", "test", "ISS", nowSeconds, expSeconds)
-
-        val jwtString = JWT.token(Algorithm.ES256, header, payload, secret, jsonEncoder, encoder, decoder)
-        assertNotNull(jwtString)
-
-        val jwtObject = JWT.decode(jwtString, jsonDecoder, decoder)
-
-        assertNotNull(jwtObject)
-        assertEquals("ES256", jwtObject?.header?.alg)
-
-        assertEquals("com.philjay.jwt", jwtObject?.payload?.sub)
-        assertEquals("test", jwtObject?.payload?.name)
-        assertEquals(nowSeconds, jwtObject?.payload?.iat)
-        assertEquals(expSeconds, jwtObject?.payload?.exp)
-        assertEquals("ISS", jwtObject?.payload?.iss)
-    }
-
-    @Test
-    fun testEncodeDecodeRS256() {
-
-        val nowSeconds = Instant.now().epochSecond
-        val expSeconds = nowSeconds + 3600
-
-        // dummy key
-        val secret = "MIICdQIBADANBgkqhkiG9w0BAQEFAASCAl8wggJbAgEAAoGBANWfjyOAEf2mqkkn\n" +
-                "31PtdAZK8HJry8T8RKoQg9CvyjP7VoFNSUP0iex21lZiC7SVG9T02I6GWb42EJ6p\n" +
-                "NfLeVtCfBELmWdSbK8uYqUfKAfPONQycRYOsf1sP/pdW8Jwvf9dAqJyYEa+FiH0X\n" +
-                "mPvBy2RCDnTCaRMu3QMr6YEm+LOzAgMBAAECgYB/8Em3xzH/Kdv+aETWbPX59tO+\n" +
-                "k1S8qyEsgSuQxldhfnu2gOUKL+CSoDGKFrpP8qVyixlPcqM4ygR2IX1P8V0oB6Ia\n" +
-                "GXucv9i3zockN0VCN2cR+1dkqkvEnBGjaRDHGCvkBXP6d59o5Qlxp5uoZ9/gcQf4\n" +
-                "yOWj9/QmMt1Yi+l1AQJBAP4DXSOJdMLCj6gppwLr7STNkAYHFA4IfE+PIAiai8Vm\n" +
-                "/CYQZAlhUpEiHgLtLPaVK24u55SyamboSKh2P4UeV/MCQQDXS1GQbLL+vVJhjL78\n" +
-                "ex/6Gkr2bPqjHlFMGihoYo9OVPAffIBvhrVXhgNYJ76LFTDnVURbp12K5LwjLyQy\n" +
-                "COVBAkAb1iaI1HF1PnkbxqTEzzIHzHcyEeiCuS9WUKsEBlu24FhVm4o69O1ldkWv\n" +
-                "sGozA5nk00MRqpO6f04nF/5SCkc9AkBQFJL1Lolx2YfgAxMzJLUjOU5y1NxxeiBx\n" +
-                "NzWahjaZw1xByfSYBzpCoPVzf+0PHMXA9mVj1iAkPqqAR9OlzMtBAkAdEvNs/xAK\n" +
-                "l5VhkxmMDGiF+HX3tetU3tzkh9v4Z0pz9nVDWGDbIPjCjhc60z7SCpOwnlF0bf92\n" +
-                "YTOPkpSdAGlO"
-
-        val header = JWTAuthHeader(alg = Algorithm.RS256.name) // dummy key id
-
-        val payload = CustomJWTAuthPayload("com.philjay.jwt", "test", "ISS", nowSeconds, expSeconds)
-
-        val jwtString = JWT.token(Algorithm.RS256, header, payload, secret, jsonEncoder, encoder, decoder)
-        assertNotNull(jwtString)
-
-        val jwtObject = JWT.decode(jwtString, jsonDecoder, decoder)
-
-        assertNotNull(jwtObject)
-        assertEquals("RS256", jwtObject?.header?.alg)
-
-        assertEquals("com.philjay.jwt", jwtObject?.payload?.sub)
-        assertEquals("test", jwtObject?.payload?.name)
-        assertEquals(nowSeconds, jwtObject?.payload?.iat)
-        assertEquals(expSeconds, jwtObject?.payload?.exp)
-        assertEquals("ISS", jwtObject?.payload?.iss)
+    // Changes unused bits of the last signature character: decodes to the same bytes in lenient decoders.
+    private fun sameBytesOtherString(jwt: String): String {
+        val alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        val last = alphabet[alphabet.indexOf(jwt.last()) xor 1]
+        return jwt.dropLast(1) + last
     }
 }

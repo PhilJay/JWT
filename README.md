@@ -6,12 +6,14 @@ Lightweight Kotlin JWT implementation (Json Web Token) designed for **Apple**, a
 No other dependencies required.
 
 ## Algorithms supported
- - ES256
- - RS256
+ - ES256, ES384, ES512
+ - RS256, RS384, RS512 (keys with at least 2048 bits)
 
-## Dependency 
+`none` and HMAC algorithms are rejected.
 
-Requires **Java 14**.
+## Dependency
+
+Requires **Java 17**.
 
 Add the following to your **build.gradle** file:
 ```groovy
@@ -22,7 +24,7 @@ allprojects {
 }
 
 dependencies {
-    implementation 'com.github.PhilJay:JWT:1.2.6'
+    implementation 'com.github.PhilJay:JWT:2.0.0'
 }
 ```
 
@@ -39,120 +41,123 @@ Or add the following to your **pom.xml**:
 <dependency>
     <groupId>com.github.PhilJay</groupId>
     <artifactId>JWT</artifactId>
-    <version>1.2.6</version>
+    <version>2.0.0</version>
 </dependency>
 ```
 
+## JSON mapping
+
+The library does not ship a JSON parser. Provide a JSON encoder and decoder with the library of your choice, e.g. Gson:
+
+```kotlin
+val gson = GsonBuilder().create()
+
+val jsonEncoder = object : JsonEncoder<AppleJWTAuthHeader, JWTAuthPayload> {
+    override fun toJson(header: AppleJWTAuthHeader): String = gson.toJson(header)
+    override fun toJson(payload: JWTAuthPayload): String = gson.toJson(payload)
+}
+
+val jsonDecoder = object : JsonDecoder<JWTAuthHeader, AppleIdentityTokenPayload> {
+    override fun headerFrom(json: String): JWTAuthHeader = gson.fromJson(json, JWTAuthHeader::class.java)
+    override fun payloadFrom(json: String): AppleIdentityTokenPayload = gson.fromJson(json, AppleIdentityTokenPayload::class.java)
+}
+```
+
+Configure your encoder to omit `null` values (Gson does this by default).
+
 ## Creating JWT
 
-Create required encoders, decoders and JSON Mapper (e.g. Gson or equivalent). These are later used to properly encode or decode the token header and payload.
+The private key is the content of the `.p8` file from the Apple developer console. The PEM header and footer are optional. Load it once with `Keys.privateKey(pem, Algorithm.ES256)` and reuse the `PrivateKey`.
+
+APNs token (valid for one hour, reuse it until then):
 
 ```kotlin
-    val gson = GsonBuilder().create()
- 
-    // generic JSON encoder
-    val jsonEncoder = object : JsonEncoder<JWTAuthHeader, JWTAuthPayload> {
-        override fun toJson(header: JWTAuthHeader): String {
-            return gson.toJson(header, JWTAuthHeader::class.java)
-        }
-    
-        override fun toJson(payload: JWTAuthPayload): String {
-            return gson.toJson(payload, JWTAuthPayload::class.java)
-        }
-    }
-
-    // Base64 encoder using apache commons
-    private val encoder = object : Base64Encoder {
-        override fun encodeURLSafe(bytes: ByteArray): String {
-            return Base64.encodeBase64URLSafeString(bytes)
-        }
-    
-        override fun encode(bytes: ByteArray): String {
-            return Base64.encodeBase64String(bytes)
-        }
-    }
-
-    // Base64 decoder using apache commons
-    private val decoder = object : Base64Decoder {
-        override fun decode(bytes: ByteArray): ByteArray {
-            return Base64.decodeBase64(bytes)
-        }
-    
-        override fun decode(string: String): ByteArray {
-            return Base64.decodeBase64(string)
-        }
-    }
+val token = JWT.tokenApple("teamId", "keyId", privateKey, jsonEncoder)
 ```
 
-Create the Apple JWT token by providing your teamId, keyId and secret (private key excluding header and footer). The teamId can be obtained from the developer member center. The keyId can be obtained when you create your secret (private key).
+Client secret for the Sign in with Apple REST API:
 
 ```kotlin
-    val token = JWT.tokenApple("teamId", "keyId", "secret", jsonEncoder, encoder, decoder)
+val clientSecret = JWT.appleClientSecret("teamId", "keyId", "com.example.app", privateKey, jsonEncoder, expiresIn = Duration.ofDays(1))
 ```
 
-Create any JWT token by providing the required algorithm, header, payload and secret (private key):
+Any other token:
 
 ```kotlin
-    val header = JWTAuthHeader(...)
-    val payload = JWTAuthPayload(...)
-    val token = JWT.token(Algorithm.ES256, header, payload, "secret", jsonEncoder, encoder, decoder)
+val header = JWTAuthHeader(alg = "ES256", kid = "keyId")
+val payload = JWTAuthPayload(iss = "issuer", iat = now, exp = now + 3600)
+val token = JWT.token(Algorithm.ES256, header, payload, privateKey, jsonEncoder)
 ```
 
-## Decoding JWT
+## Verifying Sign in with Apple
 
-If you want to decode a JWT String, create a JSON decoder:
+Fetch [Apple's public keys](https://appleid.apple.com/auth/keys) over HTTPS and parse them into a `JWKSet`. Cache them and refetch when verification fails with `NO_MATCHING_KEY`.
 
 ```kotlin
-    private val jsonDecoder = object : JsonDecoder<JWTAuthHeader, JWTAuthPayload> {
-
-        override fun headerFrom(json: String): JWTAuthHeader {
-            return gson.fromJson(json, JWTAuthHeader::class.java)
-        }
-
-        override fun payloadFrom(json: String): JWTAuthPayload {
-            return gson.fromJson(json, JWTAuthPayload::class.java)
-        }
-    }
+val jwkSet = gson.fromJson(responseBody, JWKSet::class.java)
 ```
 
-Use the json decoder to decode your token String:
-```kotlin
-    val tokenString = "ey..." // a valid JWT as a String
-    val t: JWTToken<JWTAuthHeader, JWTAuthPayload>? = JWT.decode(tokenString, jsonDecoder, decoder)
-    
-    // conveniently access properties of the token...
-    val issuer = t?.payload?.iss
-```
-
-## Verifying
-
-In order to verify a JWT received from **Sign in with Apple**, securely transmit it to your backend, then [obtain a JWK (Json Web Key) from Apple](https://developer.apple.com/documentation/signinwithapplerestapi/fetch_apple_s_public_key_for_verifying_token_signature) and use it as a public key for verification: 
+Then verify the identity token sent by your app:
 
 ```kotlin
-    val jwk: JWKObject = ... // fetch current JWK (public key) from Apple endpoint
-    val tokenString = "ey..." // the token to validate / verify (obtained from Sign in with Apple)
-    
-    // turns JWK into RSA public key, returns true if validation is successful
-    val valid = JWT.verify(tokenString, jwk, decoder) 
+val result = JWT.verifyApple(identityToken, jwkSet.keys, clientIds = setOf("com.example.app"), jsonDecoder, nonce = expectedNonce)
+
+when (result) {
+    is JWTVerificationResult.Valid -> signIn(result.token.payload.sub)
+    is JWTVerificationResult.Invalid -> reject(result.error)
+}
 ```
+
+This checks the signature, `exp`, `iat`, the issuer `https://appleid.apple.com`, that `aud` is one of your client ids and, if given, the nonce.
+
+The nonce is compared exactly as given. If your app sent a SHA-256 hash of the nonce to Apple, pass that hash.
+
+## Verifying other tokens
+
+```kotlin
+val validation = JWTValidation(issuer = "https://issuer.example", audiences = setOf("my-client"))
+val result = JWT.verify(tokenString, jwks, jsonDecoder, validation)
+```
+
+`JWTValidation` options:
+
+- `issuer`: required `iss`, or `null` to accept any issuer.
+- `audiences`: accepted `aud` values, or an empty set to accept any audience.
+- `leewaySeconds`: allowed clock difference for `exp`, `nbf` and `iat` (default 60).
+- `requireExpiration`: reject tokens without `exp` (default true).
+
+The key is picked by the token's `kid`. Without a `kid`, every key that fits the algorithm is tried. The algorithm always has to fit the key, so a token cannot switch to another algorithm.
+
+An `Invalid` result carries a `JWTVerificationError`: `MALFORMED`, `UNSUPPORTED_ALGORITHM`, `NO_MATCHING_KEY`, `INVALID_SIGNATURE`, `MISSING_EXPIRATION`, `EXPIRED`, `NOT_YET_VALID`, `ISSUED_IN_FUTURE`, `INVALID_ISSUER`, `INVALID_AUDIENCE` or `INVALID_NONCE`.
+
+`aud` is read as a single string, as Apple sends it. Tokens with an array `aud` are rejected as `MALFORMED`.
+
+Other helpers:
+
+- `JWT.verifySignature(jwt, publicKey, algorithm)` and `JWT.verifySignature(jwt, jwk)` check only the signature, not the claims.
+- `JWT.decode(jwt, jsonDecoder)` does not verify anything, so never use its result to authenticate a user.
+- `Keys.privateKey(pem, algorithm)` and `Keys.publicKey(pem, algorithm)` read PKCS#8 and X.509 PEM keys.
+- `JWKObject.fromPublicKey(key, algorithm, kid)` turns your own public key into a JWK, e.g. to publish a key set.
+
+## Migrating from 1.x
+
+- Remove the `Base64Encoder` / `Base64Decoder` and `charset` arguments. Base64url and UTF-8 are built in.
+- `JWT.verify(jwt, jwk, decoder)` is now `JWT.verifySignature(jwt, jwk)`. For Sign in with Apple use `JWT.verifyApple`, which also checks the claims.
+- ES256 signatures now use the JWS format (64 bytes R || S) instead of DER. Strict verifiers rejected the 1.x signatures.
+- `JWKObject.toRSA` is now `toPublicKey` and supports EC keys. `toRSAString` was removed.
+- RSA keys need at least 2048 bits. The header `alg` must match the signing algorithm.
+- `decode` returns null for anything that is not a signed token with exactly three parts.
+- Payload claims are nullable. `JWTAuthPayload` now also has `exp`, `nbf`, `aud`, `sub` and `jti`.
 
 ## Usage with APNs
 
-Include the token in the authentication header when you make yor push notification request to APNs:
+Include the token in the authorization header of your push request:
 
 ```
-   'authentication' 'bearer $token'
-```
-
-
-
-If you are [sending pushes to iOS 13+ devices](https://developer.apple.com/documentation/usernotifications/setting_up_a_remote_notification_server/sending_notification_requests_to_apns), also include the `apns-push-type` header:
-
-```
-   'apns-push-type' 'alert' // possible values are 'alert' or 'background'
+authorization: bearer $token
+apns-push-type: alert
 ```
 
 ## Documentation
 
-For a detailed guide, please visit the [APNs documentation](https://developer.apple.com/library/archive/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/APNSOverview.html#//apple_ref/doc/uid/TP40008194-CH8-SW1) page by Apple as well as the [verifying users](https://developer.apple.com/documentation/signinwithapplerestapi/verifying_a_user) and [generating tokens](https://developer.apple.com/documentation/signinwithapplerestapi/generate_and_validate_tokens) pages for Sign in with Apple. [jwt.io](https://jwt.io) is a good page for "debugging" tokens.
-
+For a detailed guide, please visit Apple's pages on [token based APNs authentication](https://developer.apple.com/documentation/usernotifications/establishing-a-token-based-connection-to-apns), [verifying a user](https://developer.apple.com/documentation/signinwithapplerestapi/verifying_a_user) and [generating and validating tokens](https://developer.apple.com/documentation/signinwithapplerestapi/generate_and_validate_tokens). [jwt.io](https://jwt.io) is a good page for "debugging" tokens.

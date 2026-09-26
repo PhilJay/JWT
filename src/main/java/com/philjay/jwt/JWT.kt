@@ -1,328 +1,267 @@
 package com.philjay.jwt
 
-
-import java.math.BigInteger
-import java.nio.charset.Charset
-import java.security.KeyFactory
-import java.security.NoSuchAlgorithmException
+import java.security.GeneralSecurityException
+import java.security.MessageDigest
+import java.security.PrivateKey
 import java.security.PublicKey
 import java.security.Signature
-import java.security.spec.InvalidKeySpecException
-import java.security.spec.PKCS8EncodedKeySpec
-import java.security.spec.RSAPublicKeySpec
-import java.security.spec.X509EncodedKeySpec
-import java.time.Instant
+import java.time.Clock
+import java.time.Duration
 import kotlin.text.Charsets.UTF_8
 
-
 object JWT {
-    private const val verifyAlgorithm = "SHA256withRSA"
+    /** The "iss" of Sign in with Apple identity tokens and the "aud" of Apple client secrets. */
+    const val APPLE_ISSUER = "https://appleid.apple.com"
+
+    /** Apple rejects client secrets that are valid for longer than 6 months. */
+    val APPLE_CLIENT_SECRET_MAX_LIFETIME: Duration = Duration.ofSeconds(15_777_000)
+
     private const val tokenDelimiter = '.'
 
     /**
-     * Generates a JWT token as per Apple's specifications. Does not include the required "bearer" prefix.
+     * Generates a JWT for APNs token based authentication. Does not include the required "bearer" prefix.
+     * APNs accepts a token for one hour, reuse it and refresh it before then.
      *
      * @param teamId The team identifier (can be obtained from the developer console member center)
-     * @param keyId  The key identifier (can be obtained when generating your private key)
-     * @param secret The private key (without the header and the footer - as in BEGIN KEY...)
-     * @param jsonEncoder: A mapper to transform JWT header and payload to a json String.
-     * @param encoder An encoder to base64 encode the JWT header and payload json String.
-     * @param decoder A decoder to base64 decode ByteArrays.
-     * @param charset The Charset to use for String to ByteArray encoding, defaults to UTF_8.
-     * @return A valid JWT token.
+     * @param keyId The key identifier (can be obtained when generating your private key)
+     * @param secret The private key (.p8 content), PEM header and footer are optional
+     * @param jsonEncoder A mapper to transform JWT header and payload to a json String.
      */
     fun tokenApple(
         teamId: String,
         keyId: String,
         secret: String,
         jsonEncoder: JsonEncoder<AppleJWTAuthHeader, JWTAuthPayload>,
-        encoder: Base64Encoder,
-        decoder: Base64Decoder,
-        charset: Charset = UTF_8
+        clock: Clock = Clock.systemUTC()
+    ): String = tokenApple(teamId, keyId, Keys.privateKey(secret, Algorithm.ES256), jsonEncoder, clock)
+
+    /**
+     * Generates a JWT for APNs token based authentication with an already loaded private key.
+     */
+    fun tokenApple(
+        teamId: String,
+        keyId: String,
+        privateKey: PrivateKey,
+        jsonEncoder: JsonEncoder<AppleJWTAuthHeader, JWTAuthPayload>,
+        clock: Clock = Clock.systemUTC()
     ): String {
-
-        val now = Instant.now().epochSecond // token timestamp in seconds
-
         val header = AppleJWTAuthHeader(kid = keyId)
-        val payload = JWTAuthPayload(teamId, now)
-
-        return token(Algorithm.ES256, header, payload, secret, jsonEncoder, encoder, decoder, charset)
+        val payload = JWTAuthPayload(iss = teamId, iat = clock.instant().epochSecond)
+        return token(Algorithm.ES256, header, payload, privateKey, jsonEncoder)
     }
 
     /**
-     * Generates a JWT token String.
+     * Generates the client secret for the Sign in with Apple REST API (token validation and revocation).
      *
-     * @param algorithm The algorithm to use.
-     * @param header The auth header usually containing algorithm and key id.
-     * @param payload The payload usually containing at least the team id and timestamp.
-     * @param secret The private key (without the header and the footer - as in BEGIN KEY...)
-     * @param jsonEncoder: A mapper to transform JWT header and payload to a json String.
-     * @param encoder An encoder to base64 encode the JWT header and payload json String.
-     * @param decoder A decoder to base64 decode ByteArrays.
-     * @param charset The Charset to use for String to ByteArray encoding, defaults to UTF_8.
-     * @return A valid JWT token.
+     * @param teamId The team identifier
+     * @param keyId The identifier of a key with Sign in with Apple enabled
+     * @param clientId The Services ID or App ID (bundle identifier) the secret is used for
+     * @param privateKey The private key of [keyId]
+     * @param expiresIn How long the secret is valid, at most [APPLE_CLIENT_SECRET_MAX_LIFETIME]
+     */
+    fun appleClientSecret(
+        teamId: String,
+        keyId: String,
+        clientId: String,
+        privateKey: PrivateKey,
+        jsonEncoder: JsonEncoder<AppleJWTAuthHeader, JWTAuthPayload>,
+        expiresIn: Duration = Duration.ofHours(1),
+        clock: Clock = Clock.systemUTC()
+    ): String {
+        require(!expiresIn.isNegative && !expiresIn.isZero && expiresIn <= APPLE_CLIENT_SECRET_MAX_LIFETIME) {
+            "expiresIn must be between 1 second and $APPLE_CLIENT_SECRET_MAX_LIFETIME"
+        }
+        val now = clock.instant().epochSecond
+        val header = AppleJWTAuthHeader(kid = keyId)
+        val payload = JWTAuthPayload(iss = teamId, iat = now, exp = now + expiresIn.seconds, aud = APPLE_ISSUER, sub = clientId)
+        return token(Algorithm.ES256, header, payload, privateKey, jsonEncoder)
+    }
+
+    /**
+     * Generates a signed JWT String.
+     *
+     * @param algorithm The algorithm to sign with, must equal the "alg" of [header].
+     * @param header The JWT header.
+     * @param payload The JWT payload.
+     * @param secret The PKCS#8 private key, PEM header and footer are optional.
+     * @param jsonEncoder A mapper to transform JWT header and payload to a json String.
+     * @throws IllegalArgumentException if the key does not fit the algorithm or the header.
      */
     fun <H : JWTAuthHeader, P : JWTAuthPayload> token(
         algorithm: Algorithm,
-        header: H, payload: P, secret: String, jsonEncoder: JsonEncoder<H, P>, encoder: Base64Encoder,
-        decoder: Base64Decoder, charset: Charset = UTF_8
+        header: H,
+        payload: P,
+        secret: String,
+        jsonEncoder: JsonEncoder<H, P>
+    ): String = token(algorithm, header, payload, Keys.privateKey(secret, algorithm), jsonEncoder)
+
+    /**
+     * Generates a signed JWT String with an already loaded private key.
+     *
+     * @throws IllegalArgumentException if the key does not fit the algorithm or the header.
+     */
+    fun <H : JWTAuthHeader, P : JWTAuthPayload> token(
+        algorithm: Algorithm,
+        header: H,
+        payload: P,
+        privateKey: PrivateKey,
+        jsonEncoder: JsonEncoder<H, P>
     ): String {
+        require(header.alg == algorithm.name) { "Header alg '${header.alg}' does not match algorithm $algorithm" }
+        require(algorithm.accepts(privateKey)) { "Private key does not fit algorithm $algorithm" }
 
-        val headerString = jsonEncoder.toJson(header)
-        val payloadString = jsonEncoder.toJson(payload)
+        val base64Header = Base64Url.encode(jsonEncoder.toJson(header).toByteArray(UTF_8))
+        val base64Payload = Base64Url.encode(jsonEncoder.toJson(payload).toByteArray(UTF_8))
+        val signingInput = "$base64Header$tokenDelimiter$base64Payload"
 
-        val base64Header = encoder.encodeURLSafe(headerString.toByteArray(charset))
-        val base64Payload = encoder.encodeURLSafe(payloadString.toByteArray(charset))
-
-        val value = "$base64Header$tokenDelimiter$base64Payload"
-
-        return value + tokenDelimiter + sign(algorithm, secret, value, encoder, decoder, charset)
+        val signature = Signature.getInstance(algorithm.signatureAlgorithm).run {
+            initSign(privateKey)
+            update(signingInput.toByteArray(UTF_8))
+            sign()
+        }
+        return signingInput + tokenDelimiter + Base64Url.encode(signature)
     }
 
     /**
-     * Decodes the provided JWT token string and turns it into a JWTToken object for easy property access.
-     * @param jwtTokenString The JWT token to decode as a String.
-     * @param jsonDecoder Mapper to transform the JSON String to JSON objects.
-     * @param decoder A decoder to base64 decode ByteArrays.
-     * @param charset The Charset to use for String to ByteArray encoding, defaults to UTF_8.
-     * @return JWT token object.
+     * Decodes a JWT String WITHOUT verifying its signature or claims. Never trust the result for authentication,
+     * use [verify] or [verifyApple] instead.
+     *
+     * @return The decoded token, or null if it is malformed.
      */
     fun <H : JWTAuthHeader, P : JWTAuthPayload> decode(
         jwtTokenString: String,
+        jsonDecoder: JsonDecoder<H, P>
+    ): JWTToken<H, P>? = parse(jwtTokenString, jsonDecoder)?.token
+
+    /**
+     * Verifies only the signature of a JWT with the given public key. The algorithm comes from the caller, never
+     * from the token. Does not check any claims such as "exp", "iss" or "aud".
+     */
+    fun verifySignature(jwt: String, publicKey: PublicKey, algorithm: Algorithm): Boolean {
+        val parts = jwt.split(tokenDelimiter)
+        if (parts.size != 3) return false
+        val signature = Base64Url.decodeOrNull(parts[2]) ?: return false
+        return verifySignature("${parts[0]}$tokenDelimiter${parts[1]}", signature, publicKey, algorithm)
+    }
+
+    /**
+     * Verifies only the signature of a JWT with the given JWK. Does not check any claims such as "exp", "iss" or "aud".
+     */
+    fun verifySignature(jwt: String, jwk: JWKObject): Boolean {
+        val algorithm = jwk.algorithm() ?: return false
+        val key = jwk.toPublicKey() ?: return false
+        return verifySignature(jwt, key, algorithm)
+    }
+
+    /**
+     * Verifies the signature and the claims of a JWT.
+     *
+     * The key is picked from [keys] by the token's "kid". Without a "kid", every key that fits the algorithm is tried.
+     * The token's "alg" must be supported and fit the key.
+     * Afterwards "exp", "nbf", "iat", "iss" and "aud" are checked as configured in [validation].
+     *
+     * @param jwt The JWT String to verify.
+     * @param keys The trusted public keys, e.g. from a JWKS endpoint.
+     * @param jsonDecoder Mapper to transform the JSON Strings to header and payload objects.
+     * @param validation The claim checks.
+     * @param clock The clock to check the time based claims against.
+     */
+    fun <H : JWTAuthHeader, P : JWTAuthPayload> verify(
+        jwt: String,
+        keys: List<JWKObject>,
         jsonDecoder: JsonDecoder<H, P>,
-        decoder: Base64Decoder,
-        charset: Charset = UTF_8
-    ): JWTToken<H, P>? {
-        val parts = jwtTokenString.split(tokenDelimiter)
-        return if (parts.size >= 2) {
+        validation: JWTValidation,
+        clock: Clock = Clock.systemUTC()
+    ): JWTVerificationResult<H, P> {
+        val parsed = parse(jwt, jsonDecoder) ?: return invalid(JWTVerificationError.MALFORMED)
+        val header = parsed.token.header
+        val payload = parsed.token.payload
 
-            val headerJson = decoder.decode(parts[0].toByteArray(charset)).toString(charset)
-            val payloadJson = decoder.decode(parts[1].toByteArray(charset)).toString(charset)
+        val algorithm = Algorithm.fromName(header.alg) ?: return invalid(JWTVerificationError.UNSUPPORTED_ALGORITHM)
+        val candidates = keys
+            .filter { header.kid == null || it.kid == header.kid }
+            .filter { it.supports(algorithm) }
+            .mapNotNull { it.toPublicKey() }
+        if (candidates.isEmpty()) return invalid(JWTVerificationError.NO_MATCHING_KEY)
+        if (candidates.none { verifySignature(parsed.signingInput, parsed.token.signature, it, algorithm) }) {
+            return invalid(JWTVerificationError.INVALID_SIGNATURE)
+        }
 
-            val header: H = jsonDecoder.headerFrom(headerJson)
-            val payload: P = jsonDecoder.payloadFrom(payloadJson)
-
-            if (parts.size == 3) {
-                val signature = decoder.decode(parts[2].toByteArray(charset))
-                JWTToken(header, payload, signature)
-            } else {
-                JWTToken(header, payload)
-            }
-        } else {
-            null
+        val now = clock.instant().epochSecond
+        val leeway = validation.leewaySeconds
+        val exp = payload.exp
+        val nbf = payload.nbf
+        val iat = payload.iat
+        return when {
+            exp == null && validation.requireExpiration -> invalid(JWTVerificationError.MISSING_EXPIRATION)
+            exp != null && now - leeway >= exp -> invalid(JWTVerificationError.EXPIRED)
+            nbf != null && now + leeway < nbf -> invalid(JWTVerificationError.NOT_YET_VALID)
+            iat != null && now + leeway < iat -> invalid(JWTVerificationError.ISSUED_IN_FUTURE)
+            validation.issuer != null && payload.iss != validation.issuer -> invalid(JWTVerificationError.INVALID_ISSUER)
+            validation.audiences.isNotEmpty() && payload.aud !in validation.audiences -> invalid(JWTVerificationError.INVALID_AUDIENCE)
+            else -> JWTVerificationResult.Valid(parsed.token)
         }
     }
 
     /**
-     * Verifies the provided JWT String with the provided JWK object (RSA public key).
-     * @param jwt: The JWK String to validate.
-     * @param jwk: The Json Web Key (RSA public key) obtained from Apple for validation.
-     * @param decoder: Base64 decoder for decoding the JWT signature.
-     * @return True if validation was successful, false if not.
+     * Verifies an identity token from Sign in with Apple: signature, expiration, issuer, audience and optionally the nonce.
+     *
+     * @param identityToken The identity token sent by your app.
+     * @param keys Apple's current public keys from https://appleid.apple.com/auth/keys (cache them, refresh on unknown "kid").
+     * @param clientIds Your App IDs (bundle identifiers) and Services IDs that may receive tokens.
+     * @param jsonDecoder Mapper to transform the JSON Strings to header and payload objects.
+     * @param nonce The nonce you expect in the token, exactly as sent to Apple. Null skips the nonce check.
      */
-    fun verify(jwt: String, jwk: JWKObject, decoder: Base64Decoder, charset: Charset = UTF_8): Boolean {
+    fun <H : JWTAuthHeader, P : AppleIdentityTokenPayload> verifyApple(
+        identityToken: String,
+        keys: List<JWKObject>,
+        clientIds: Set<String>,
+        jsonDecoder: JsonDecoder<H, P>,
+        nonce: String? = null,
+        clock: Clock = Clock.systemUTC()
+    ): JWTVerificationResult<H, P> {
+        require(clientIds.isNotEmpty()) { "clientIds must not be empty" }
+        val result = verify(identityToken, keys, jsonDecoder, JWTValidation(APPLE_ISSUER, clientIds), clock)
+        val token = result.tokenOrNull() ?: return result
+        if (nonce != null) {
+            val tokenNonce = token.payload.nonce ?: return invalid(JWTVerificationError.INVALID_NONCE)
+            if (!MessageDigest.isEqual(tokenNonce.toByteArray(UTF_8), nonce.toByteArray(UTF_8))) {
+                return invalid(JWTVerificationError.INVALID_NONCE)
+            }
+        }
+        return result
+    }
 
-        val rsa = jwk.toRSA(decoder)
+    private class ParsedToken<H : JWTAuthHeader, P : JWTAuthPayload>(val token: JWTToken<H, P>, val signingInput: String)
 
-        return if (rsa == null) {
+    private fun <H : JWTAuthHeader, P : JWTAuthPayload> parse(jwt: String, jsonDecoder: JsonDecoder<H, P>): ParsedToken<H, P>? {
+        val parts = jwt.split(tokenDelimiter)
+        if (parts.size != 3) return null
+        val headerJson = Base64Url.decodeOrNull(parts[0])?.toString(UTF_8) ?: return null
+        val payloadJson = Base64Url.decodeOrNull(parts[1])?.toString(UTF_8) ?: return null
+        val signature = Base64Url.decodeOrNull(parts[2]) ?: return null
+        return try {
+            val header: H? = jsonDecoder.headerFrom(headerJson)
+            val payload: P? = jsonDecoder.payloadFrom(payloadJson)
+            if (header == null || payload == null) return null
+            ParsedToken(JWTToken(header, payload, signature), "${parts[0]}$tokenDelimiter${parts[1]}")
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun verifySignature(signingInput: String, signature: ByteArray, key: PublicKey, algorithm: Algorithm): Boolean {
+        if (!algorithm.accepts(key)) return false
+        return try {
+            Signature.getInstance(algorithm.signatureAlgorithm).run {
+                initVerify(key)
+                update(signingInput.toByteArray(UTF_8))
+                verify(signature)
+            }
+        } catch (e: GeneralSecurityException) {
             false
-        } else {
-            val parts = jwt.split(tokenDelimiter)
-
-            if (parts.size == 3) {
-                val header = parts[0].toByteArray(charset)
-                val payload = parts[1].toByteArray(charset)
-                val tokenSignature = decoder.decode(parts[2])
-
-                val rsaSignature = Signature.getInstance(verifyAlgorithm)
-                rsaSignature.initVerify(rsa)
-                rsaSignature.update(header)
-                rsaSignature.update(tokenDelimiter.code.toByte())
-                rsaSignature.update(payload)
-                rsaSignature.verify(tokenSignature)
-            } else {
-                false
-            }
         }
     }
 
-    private fun sign(
-        algorithm: Algorithm,
-        secret: String,
-        data: String,
-        encoder: Base64Encoder,
-        decoder: Base64Decoder,
-        charset: Charset
-    ): String {
-
-        val factory = KeyFactory.getInstance(algorithm.keyAlg)
-        val keySpec = PKCS8EncodedKeySpec(decoder.decode(secret.toByteArray(charset)))
-        val key = factory.generatePrivate(keySpec)
-
-        val sig = Signature.getInstance(algorithm.alg)
-        sig.initSign(key)
-        sig.update(data.toByteArray(charset))
-
-        return encoder.encodeURLSafe(sig.sign())
-    }
+    private fun invalid(error: JWTVerificationError) = JWTVerificationResult.Invalid(error)
 }
-
-enum class Algorithm(val alg: String, val keyAlg: String) {
-    ES256("SHA256withECDSA", "EC"), RS256("SHA256withRSA", "RSA")
-}
-
-/**
- * Mapper to transform auth header and payload to a json String.
- */
-interface JsonEncoder<H : JWTAuthHeader, P : JWTAuthPayload> {
-    /**
-     * Transforms the provided header to a json String.
-     * @param header The header to transform.
-     * @return A json String representing the header.
-     */
-    fun toJson(header: H): String
-
-    /**
-     * Transforms the provided payload to a json String.
-     * @param payload The header to transform.
-     * @return A json String representing the payload.
-     */
-    fun toJson(payload: P): String
-}
-
-interface JsonDecoder<H : JWTAuthHeader, P : JWTAuthPayload> {
-    /**
-     * Transforms the provided header json String into a header object.
-     * @return A header object representing the json String.
-     */
-    fun headerFrom(json: String): H
-
-    /**
-     * Transforms the provided payload json String into a payload object.
-     * @return A payload object representing the json String.
-     */
-    fun payloadFrom(json: String): P
-}
-
-interface Base64Encoder {
-    /**
-     * Base64 encodes the provided bytes in an URL safe way.
-     * @param bytes The ByteArray to be encoded.
-     * @return The encoded String.
-     */
-    fun encodeURLSafe(bytes: ByteArray): String
-
-    /**
-     * Base64 encodes the provided bytes.
-     * @param bytes The ByteArray to be encoded.
-     * @return The encoded String.
-     */
-    fun encode(bytes: ByteArray): String
-}
-
-interface Base64Decoder {
-    /**
-     * Base64 encodes the provided bytes.
-     * @param bytes The ByteArray to be decoded.
-     * @return The decoded bytes.
-     */
-    fun decode(bytes: ByteArray): ByteArray
-
-    /**
-     * Base64 encodes the provided String.
-     * @param string The String to be decoded.
-     * @return The decoded String as a ByteArray.
-     */
-    fun decode(string: String): ByteArray
-}
-
-/**
- * JWTToken representation with header and payload. Used for String token decoding.
- */
-open class JWTToken<H : JWTAuthHeader, P : JWTAuthPayload>(
-    val header: H,
-    val payload: P,
-    val signature: ByteArray? = null
-)
-
-/**
- * An object representing a Json Web Key (JWK).
- */
-open class JWKObject(
-    val kty: String,
-    val kid: String,
-    val use: String,
-    val alg: String,
-    val n: String,
-    val e: String
-) {
-    /**
-     * Turns the JWK into an RSA public key.
-     * @return A valid RSA public key.
-     */
-    open fun toRSA(decoder: Base64Decoder): PublicKey? {
-
-        return try {
-            val kf = KeyFactory.getInstance("RSA")
-
-            val modulus = BigInteger(1, decoder.decode(n))
-            val exponent = BigInteger(1, decoder.decode(e))
-            return kf.generatePublic(RSAPublicKeySpec(modulus, exponent))
-        } catch (e: InvalidKeySpecException) {
-            e.printStackTrace()
-            null
-        } catch (e: NoSuchAlgorithmException) {
-            e.printStackTrace()
-            null
-        }
-    }
-
-    /**
-     * Turns the JWK into an RSA public key in String format.
-     * @return A valid RSA public key String.
-     */
-    open fun toRSAString(encoder: Base64Encoder, decoder: Base64Decoder): String? {
-
-        return try {
-            val rsa = toRSA(decoder) ?: return null
-
-            val kf = KeyFactory.getInstance("RSA")
-            val spec: X509EncodedKeySpec = kf.getKeySpec(rsa, X509EncodedKeySpec::class.java)
-            return encoder.encode(spec.encoded)
-        } catch (e: InvalidKeySpecException) {
-            e.printStackTrace()
-            null
-        } catch (e: NoSuchAlgorithmException) {
-            e.printStackTrace()
-            null
-        }
-    }
-}
-
-/**
- * JWT Authentication token header.
- */
-open class JWTAuthHeader(
-    /** the encryption algorithm used */
-    val alg: String
-)
-
-/**
- * JWT Authentication token header for Apple.
- */
-class AppleJWTAuthHeader(
-    /** the encryption algorithm used, defaults to ES256 */
-    alg: String = Algorithm.ES256.name,
-    /** the key identifier (found when generating private key) */
-    val kid: String
-) : JWTAuthHeader(alg)
-
-/**
- * JWT authentication token payload.
- */
-open class JWTAuthPayload(
-    /** the issuer of the token (team id found in developer member center) */
-    val iss: String,
-    /** token issued at timestamp in seconds since Epoch (UTC) */
-    val iat: Long
-)
