@@ -125,12 +125,13 @@ val result = JWT.verify(tokenString, jwks, jsonDecoder, validation)
 - `audiences`: accepted `aud` values, or an empty set to accept any audience.
 - `leewaySeconds`: allowed clock difference for `exp`, `nbf` and `iat` (default 60).
 - `requireExpiration`: reject tokens without `exp` (default true).
+- `maxTokenLength`: reject longer tokens before decoding them (default `JWT.MAX_TOKEN_LENGTH`, 16 KB).
 
 The key is picked by the token's `kid`. Without a `kid`, every key that fits the algorithm is tried. The algorithm always has to fit the key, so a token cannot switch to another algorithm.
 
-An `Invalid` result carries a `JWTVerificationError`: `MALFORMED`, `UNSUPPORTED_ALGORITHM`, `NO_MATCHING_KEY`, `INVALID_SIGNATURE`, `MISSING_EXPIRATION`, `EXPIRED`, `NOT_YET_VALID`, `ISSUED_IN_FUTURE`, `INVALID_ISSUER`, `INVALID_AUDIENCE` or `INVALID_NONCE`.
+An `Invalid` result carries a `JWTVerificationError`: `TOO_LONG`, `MALFORMED`, `UNSUPPORTED_ALGORITHM`, `NO_MATCHING_KEY`, `INVALID_SIGNATURE`, `MISSING_EXPIRATION`, `EXPIRED`, `NOT_YET_VALID`, `ISSUED_IN_FUTURE`, `INVALID_ISSUER`, `INVALID_AUDIENCE` or `INVALID_NONCE`.
 
-`aud` is read as a single string, as Apple sends it. Tokens with an array `aud` are rejected as `MALFORMED`.
+`aud` may be a single string (as Apple sends it) or an array. Read it with `payload.audiences()`. A token passes the audience check if one of its values is in `audiences`.
 
 Other helpers:
 
@@ -147,7 +148,8 @@ Other helpers:
 - `JWKObject.toRSA` is now `toPublicKey` and supports EC keys. `toRSAString` was removed.
 - RSA keys need at least 2048 bits. The header `alg` must match the signing algorithm.
 - `decode` returns null for anything that is not a signed token with exactly three parts.
-- Payload claims are nullable. `JWTAuthPayload` now also has `exp`, `nbf`, `aud`, `sub` and `jti`.
+- Payload claims are nullable. `JWTAuthPayload` now also has `exp`, `nbf`, `aud`, `sub` and `jti`. `aud` is a `String` or a `List<String>`.
+- Tokens longer than 16 KB are rejected by default.
 
 ## Usage with APNs
 

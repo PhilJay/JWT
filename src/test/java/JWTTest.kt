@@ -22,7 +22,7 @@ class CustomPayload(
     iat: Long? = null,
     exp: Long? = null,
     nbf: Long? = null,
-    aud: String? = null,
+    aud: Any? = null,
     sub: String? = null
 ) : JWTAuthPayload(iss, iat, exp, nbf, aud, sub)
 
@@ -136,6 +136,9 @@ class JWTTest {
 
         val expiredWithinLeeway = CustomPayload("n", iss = "issuer", exp = now - 30, aud = "client")
         assertTrue(verify(token(expiredWithinLeeway)).isValid)
+
+        val audienceArray = CustomPayload("n", iss = "issuer", exp = now + 600, aud = listOf("other-app", "client"))
+        assertEquals(listOf("other-app", "client"), verify(token(audienceArray)).tokenOrNull()?.payload?.audiences())
     }
 
     @Test
@@ -149,6 +152,7 @@ class JWTTest {
         assertEquals(JWTVerificationError.NO_MATCHING_KEY, errorOf(token(kid = "unknown")))
         assertEquals(JWTVerificationError.NO_MATCHING_KEY, errorOf(token(kid = "ec")))
         assertEquals(JWTVerificationError.MALFORMED, errorOf("$header.$otherPayload"))
+        assertEquals(JWTVerificationError.TOO_LONG, errorOf("a".repeat(JWT.MAX_TOKEN_LENGTH + 1)))
         assertEquals(JWTVerificationError.MALFORMED, errorOf(sameBytesOtherString(token(algorithm = Algorithm.ES256, kid = "ec"))))
         assertFalse(JWT.verifySignature(valid, ecKeys.public, Algorithm.ES256))
 
@@ -171,6 +175,8 @@ class JWTTest {
         assertEquals(JWTVerificationError.ISSUED_IN_FUTURE, errorFor(CustomPayload("n", iss = "issuer", iat = now + 300, exp = now + 600, aud = "client")))
         assertEquals(JWTVerificationError.INVALID_ISSUER, errorFor(CustomPayload("n", iss = "other", exp = now + 600, aud = "client")))
         assertEquals(JWTVerificationError.INVALID_AUDIENCE, errorFor(CustomPayload("n", iss = "issuer", exp = now + 600, aud = "other-app")))
+        assertEquals(JWTVerificationError.INVALID_AUDIENCE, errorFor(CustomPayload("n", iss = "issuer", exp = now + 600, aud = listOf("a", "b"))))
+        assertThrows(IllegalArgumentException::class.java) { CustomPayload("n", aud = 42) }
     }
 
     @Test

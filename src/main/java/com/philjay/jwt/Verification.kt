@@ -8,15 +8,18 @@ package com.philjay.jwt
 class JWTValidation(
     /** the required "iss" value, or null to accept any issuer */
     val issuer: String?,
-    /** the accepted "aud" values (e.g. your client ids), or empty to accept any audience */
+    /** the accepted "aud" values (e.g. your client ids), or empty to accept any audience. A token with an "aud" array is accepted if one of its values matches. */
     val audiences: Set<String>,
     /** allowed clock difference for "exp", "nbf" and "iat" */
     val leewaySeconds: Long = 60,
     /** reject tokens without an "exp" claim */
-    val requireExpiration: Boolean = true
+    val requireExpiration: Boolean = true,
+    /** reject longer tokens before decoding them */
+    val maxTokenLength: Int = JWT.MAX_TOKEN_LENGTH
 ) {
     init {
         require(leewaySeconds >= 0) { "leewaySeconds must not be negative" }
+        require(maxTokenLength > 0) { "maxTokenLength must be positive" }
     }
 }
 
@@ -45,6 +48,8 @@ sealed class JWTVerificationResult<out H : JWTAuthHeader, out P : JWTAuthPayload
  * The reason why [JWT.verify] or [JWT.verifyApple] rejected a token. The checks run in the order listed here.
  */
 enum class JWTVerificationError {
+    /** longer than [JWTValidation.maxTokenLength] */
+    TOO_LONG,
     /** not three base64url parts, or header / payload could not be parsed */
     MALFORMED,
     /** "alg" is missing or not supported (e.g. "none") */
@@ -63,7 +68,7 @@ enum class JWTVerificationError {
     ISSUED_IN_FUTURE,
     /** "iss" is not [JWTValidation.issuer] */
     INVALID_ISSUER,
-    /** "aud" is not one of [JWTValidation.audiences] */
+    /** none of the "aud" values is in [JWTValidation.audiences] */
     INVALID_AUDIENCE,
     /** "nonce" is missing or not the expected value (only [JWT.verifyApple]) */
     INVALID_NONCE

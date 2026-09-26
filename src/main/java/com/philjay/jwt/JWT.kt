@@ -16,6 +16,12 @@ object JWT {
     /** Apple rejects client secrets that are valid for longer than 6 months. */
     val APPLE_CLIENT_SECRET_MAX_LIFETIME: Duration = Duration.ofSeconds(15_777_000)
 
+    /**
+     * Default maximum JWT length in characters. Apple identity tokens are about 1 KB and most servers cap all HTTP
+     * headers at 8 KB, so real tokens fit easily while oversized input is rejected before it is decoded.
+     */
+    const val MAX_TOKEN_LENGTH = 16 * 1024
+
     private const val tokenDelimiter = '.'
 
     /**
@@ -126,18 +132,22 @@ object JWT {
      * Decodes a JWT String WITHOUT verifying its signature or claims. Never trust the result for authentication,
      * use [verify] or [verifyApple] instead.
      *
-     * @return The decoded token, or null if it is malformed.
+     * @param maxLength Longer Strings are not decoded.
+     * @return The decoded token, or null if it is malformed or too long.
      */
     fun <H : JWTAuthHeader, P : JWTAuthPayload> decode(
         jwtTokenString: String,
-        jsonDecoder: JsonDecoder<H, P>
-    ): JWTToken<H, P>? = parse(jwtTokenString, jsonDecoder)?.token
+        jsonDecoder: JsonDecoder<H, P>,
+        maxLength: Int = MAX_TOKEN_LENGTH
+    ): JWTToken<H, P>? = if (jwtTokenString.length > maxLength) null else parse(jwtTokenString, jsonDecoder)?.token
 
     /**
      * Verifies only the signature of a JWT with the given public key. The algorithm comes from the caller, never
      * from the token. Does not check any claims such as "exp", "iss" or "aud".
+     * Returns false for tokens longer than [MAX_TOKEN_LENGTH].
      */
     fun verifySignature(jwt: String, publicKey: PublicKey, algorithm: Algorithm): Boolean {
+        if (jwt.length > MAX_TOKEN_LENGTH) return false
         val parts = jwt.split(tokenDelimiter)
         if (parts.size != 3) return false
         val signature = Base64Url.decodeOrNull(parts[2]) ?: return false
@@ -146,6 +156,7 @@ object JWT {
 
     /**
      * Verifies only the signature of a JWT with the given JWK. Does not check any claims such as "exp", "iss" or "aud".
+     * Returns false for tokens longer than [MAX_TOKEN_LENGTH].
      */
     fun verifySignature(jwt: String, jwk: JWKObject): Boolean {
         val algorithm = jwk.algorithm() ?: return false
@@ -156,6 +167,7 @@ object JWT {
     /**
      * Verifies the signature and the claims of a JWT.
      *
+     * Tokens longer than [JWTValidation.maxTokenLength] are rejected before decoding.
      * The key is picked from [keys] by the token's "kid". Without a "kid", every key that fits the algorithm is tried.
      * The token's "alg" must be supported and fit the key.
      * Afterwards "exp", "nbf", "iat", "iss" and "aud" are checked as configured in [validation].
@@ -173,6 +185,7 @@ object JWT {
         validation: JWTValidation,
         clock: Clock = Clock.systemUTC()
     ): JWTVerificationResult<H, P> {
+        if (jwt.length > validation.maxTokenLength) return invalid(JWTVerificationError.TOO_LONG)
         val parsed = parse(jwt, jsonDecoder) ?: return invalid(JWTVerificationError.MALFORMED)
         val header = parsed.token.header
         val payload = parsed.token.payload
@@ -198,7 +211,7 @@ object JWT {
             nbf != null && now + leeway < nbf -> invalid(JWTVerificationError.NOT_YET_VALID)
             iat != null && now + leeway < iat -> invalid(JWTVerificationError.ISSUED_IN_FUTURE)
             validation.issuer != null && payload.iss != validation.issuer -> invalid(JWTVerificationError.INVALID_ISSUER)
-            validation.audiences.isNotEmpty() && payload.aud !in validation.audiences -> invalid(JWTVerificationError.INVALID_AUDIENCE)
+            validation.audiences.isNotEmpty() && payload.audiences().none { it in validation.audiences } -> invalid(JWTVerificationError.INVALID_AUDIENCE)
             else -> JWTVerificationResult.Valid(parsed.token)
         }
     }

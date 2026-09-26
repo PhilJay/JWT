@@ -73,13 +73,28 @@ open class JWTAuthPayload(
     val exp: Long? = null,
     /** not before */
     val nbf: Long? = null,
-    /** audience */
-    val aud: String? = null,
+    /** audience: a String or a List<String>, as allowed by RFC 7519. Read it with [audiences]. */
+    val aud: Any? = null,
     /** subject */
     val sub: String? = null,
     /** unique token id */
     val jti: String? = null
-)
+) {
+    init {
+        require(aud == null || aud is String || (aud is List<*> && aud.all { it is String })) {
+            "aud must be a String or a List<String>"
+        }
+    }
+
+    /**
+     * The "aud" values as a list, whether the token holds a single String or an array. Values that are not Strings are left out.
+     */
+    fun audiences(): List<String> = when (val value = aud) {
+        is String -> listOf(value)
+        is Collection<*> -> value.filterIsInstance<String>()
+        else -> emptyList()
+    }
+}
 
 /**
  * Payload of an identity token from Sign in with Apple.
