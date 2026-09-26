@@ -103,7 +103,7 @@ open class AppleIdentityTokenPayload(
     iss: String? = null,
     iat: Long? = null,
     exp: Long? = null,
-    aud: String? = null,
+    aud: Any? = null,
     sub: String? = null,
     /** the nonce your app passed to the authorization request */
     val nonce: String? = null,

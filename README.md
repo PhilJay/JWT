@@ -65,9 +65,33 @@ val jsonDecoder = object : JsonDecoder<JWTAuthHeader, AppleIdentityTokenPayload>
 
 Configure your encoder to omit `null` values (Gson does this by default).
 
+With Jackson (`jackson-module-kotlin`), omit `null` values and ignore unknown properties, because Apple adds fields such as `email_verified` and `auth_time`:
+
+```kotlin
+val mapper = jacksonObjectMapper()
+    .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL)
+    .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+
+val jsonEncoder = object : JsonEncoder<AppleJWTAuthHeader, JWTAuthPayload> {
+    override fun toJson(header: AppleJWTAuthHeader): String = mapper.writeValueAsString(header)
+    override fun toJson(payload: JWTAuthPayload): String = mapper.writeValueAsString(payload)
+}
+
+val jsonDecoder = object : JsonDecoder<JWTAuthHeader, AppleIdentityTokenPayload> {
+    override fun headerFrom(json: String): JWTAuthHeader = mapper.readValue(json)
+    override fun payloadFrom(json: String): AppleIdentityTokenPayload = mapper.readValue(json)
+}
+```
+
 ## Creating JWT
 
-The private key is the content of the `.p8` file from the Apple developer console. The PEM header and footer are optional. Load it once with `Keys.privateKey(pem, Algorithm.ES256)` and reuse the `PrivateKey`.
+The private key is the content of the `.p8` file from the Apple developer console. The PEM header and footer are optional. Load it once and reuse the `PrivateKey`:
+
+```kotlin
+val privateKey = Keys.privateKey(File("AuthKey_KEYID12345.p8").readText(), Algorithm.ES256)
+```
+
+Keep the key out of your repository, e.g. load it from an environment variable or a secret store.
 
 APNs token (valid for one hour, reuse it until then):
 
@@ -112,6 +136,59 @@ This checks the signature, `exp`, `iat`, the issuer `https://appleid.apple.com`,
 
 The nonce is compared exactly as given. If your app sent a SHA-256 hash of the nonce to Apple, pass that hash.
 
+### Example: Sign in with Apple backend
+
+A verifier that caches Apple's keys and refetches them when Apple rotates its keys. It refetches at most once per minute, so tokens with made-up `kid` values cannot flood Apple with requests.
+
+```kotlin
+class AppleSignIn(private val clientIds: Set<String>) {
+    private val http = HttpClient.newHttpClient()
+    @Volatile private var keys: List<JWKObject> = emptyList()
+    @Volatile private var keysFetchedAt = Instant.EPOCH
+
+    fun verify(identityToken: String, nonce: String): AppleIdentityTokenPayload? {
+        var result = JWT.verifyApple(identityToken, keys, clientIds, jsonDecoder, nonce)
+        if ((result as? JWTVerificationResult.Invalid)?.error == JWTVerificationError.NO_MATCHING_KEY && refreshKeys()) {
+            result = JWT.verifyApple(identityToken, keys, clientIds, jsonDecoder, nonce)
+        }
+        return result.tokenOrNull()?.payload
+    }
+
+    @Synchronized
+    private fun refreshKeys(): Boolean {
+        if (Duration.between(keysFetchedAt, Instant.now()) < Duration.ofMinutes(1)) return false
+        val request = HttpRequest.newBuilder(URI("https://appleid.apple.com/auth/keys")).build()
+        val body = http.send(request, HttpResponse.BodyHandlers.ofString()).body()
+        keys = gson.fromJson(body, JWKSet::class.java).keys
+        keysFetchedAt = Instant.now()
+        return true
+    }
+}
+
+val appleSignIn = AppleSignIn(clientIds = setOf("com.example.app"))
+val user = appleSignIn.verify(identityToken, nonce) ?: throw UnauthorizedException()
+val appleUserId = user.sub // stable user id, use it to find or create the account
+```
+
+To get refresh tokens (or to revoke them later, which Apple requires on account deletion), exchange the authorization code from your app with a client secret:
+
+```kotlin
+val clientSecret = JWT.appleClientSecret("TEAMID1234", "KEYID12345", "com.example.app", privateKey, jsonEncoder)
+val form = mapOf(
+    "client_id" to "com.example.app",
+    "client_secret" to clientSecret,
+    "code" to authorizationCode,
+    "grant_type" to "authorization_code"
+).entries.joinToString("&") { "${it.key}=${URLEncoder.encode(it.value, UTF_8)}" }
+
+val request = HttpRequest.newBuilder(URI("https://appleid.apple.com/auth/token"))
+    .header("content-type", "application/x-www-form-urlencoded")
+    .POST(HttpRequest.BodyPublishers.ofString(form))
+    .build()
+val response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString())
+// the response contains refresh_token and an id_token, which you can verify with appleSignIn.verify
+```
+
 ## Verifying other tokens
 
 ```kotlin
@@ -140,6 +217,39 @@ Other helpers:
 - `Keys.privateKey(pem, algorithm)` and `Keys.publicKey(pem, algorithm)` read PKCS#8 and X.509 PEM keys.
 - `JWKObject.fromPublicKey(key, algorithm, kid)` turns your own public key into a JWK, e.g. to publish a key set.
 
+## Issuing your own tokens
+
+Add your own claims by extending `JWTAuthPayload`:
+
+```kotlin
+class SessionPayload(
+    val role: String,
+    iss: String,
+    iat: Long,
+    exp: Long,
+    aud: String,
+    sub: String
+) : JWTAuthPayload(iss = iss, iat = iat, exp = exp, aud = aud, sub = sub)
+```
+
+`sessionEncoder` and `sessionDecoder` are JSON mappers for `SessionPayload`, built like the ones above. Sign with your private key and publish the public key as a key set, e.g. at `/.well-known/jwks.json`. The `kid` lets you rotate keys: publish the new key next to the old one before you switch.
+
+```kotlin
+val now = Instant.now().epochSecond
+val payload = SessionPayload("admin", "https://api.example.com", now, now + 900, "my-app", "user-42")
+val token = JWT.token(Algorithm.ES256, JWTAuthHeader("ES256", kid = "2026-09"), payload, privateKey, sessionEncoder)
+
+val jwks = JWKSet(listOf(JWKObject.fromPublicKey(publicKey, Algorithm.ES256, kid = "2026-09")))
+val jwksJson = gson.toJson(jwks)
+```
+
+Verify the token in any service that knows the key set:
+
+```kotlin
+val validation = JWTValidation(issuer = "https://api.example.com", audiences = setOf("my-app"))
+val role = JWT.verify(token, jwks.keys, sessionDecoder, validation).tokenOrNull()?.payload?.role
+```
+
 ## Migrating from 1.x
 
 - Remove the `Base64Encoder` / `Base64Decoder` and `charset` arguments. Base64url and UTF-8 are built in.
@@ -153,11 +263,38 @@ Other helpers:
 
 ## Usage with APNs
 
-Include the token in the authorization header of your push request:
+APNs rejects tokens older than one hour and also rejects creating new tokens too often. Create one token and refresh it every 50 minutes:
 
+```kotlin
+class ApnsTokenProvider(private val teamId: String, private val keyId: String, private val privateKey: PrivateKey) {
+    private var token: String? = null
+    private var createdAt = Instant.EPOCH
+
+    @Synchronized
+    fun token(): String {
+        val current = token
+        if (current != null && Duration.between(createdAt, Instant.now()) < Duration.ofMinutes(50)) return current
+        return JWT.tokenApple(teamId, keyId, privateKey, jsonEncoder).also {
+            token = it
+            createdAt = Instant.now()
+        }
+    }
+}
 ```
-authorization: bearer $token
-apns-push-type: alert
+
+Send the push over HTTP/2 with the token in the `authorization` header. Use `api.sandbox.push.apple.com` for development builds.
+
+```kotlin
+val tokens = ApnsTokenProvider("TEAMID1234", "KEYID12345", privateKey)
+val http = HttpClient.newBuilder().version(HttpClient.Version.HTTP_2).build()
+
+val request = HttpRequest.newBuilder(URI("https://api.push.apple.com/3/device/$deviceToken"))
+    .header("authorization", "bearer ${tokens.token()}")
+    .header("apns-topic", "com.example.app")
+    .header("apns-push-type", "alert")
+    .POST(HttpRequest.BodyPublishers.ofString("""{"aps":{"alert":"Hello"}}"""))
+    .build()
+val response = http.send(request, HttpResponse.BodyHandlers.ofString())
 ```
 
 ## Documentation
